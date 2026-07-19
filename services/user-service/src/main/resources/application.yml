@@ -20,6 +20,9 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
   security:
     oauth2:
       resourceserver:

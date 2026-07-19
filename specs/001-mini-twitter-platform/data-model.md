@@ -29,8 +29,8 @@
 | `normalizedEmail` | string | `trim + lowercase(Locale.ROOT)`; unique |
 | `username` | string | 3-30 characters; `[A-Za-z0-9_]+`; immutable |
 | `normalizedUsername` | string | lowercase username; unique |
-| `displayName` | string | trimmed, 1-50 Unicode characters |
-| `bio` | string | trimmed, 1-160 Unicode characters |
+| `displayName` | string | trimmed, 1-80 Unicode code points |
+| `bio` | string | trimmed, 0-160 Unicode code points |
 | `passwordHash` | string | BCrypt only; never returned or logged |
 | `createdAt` | timestamp | Set once |
 
@@ -42,7 +42,7 @@ Indexes/constraints:
 Validation notes:
 
 - Registration is one transaction, so a uniqueness failure creates no partial profile.
-- Password input is 8-72 UTF-8 bytes before hashing. The raw password is never retained after
+- Password input is 12-72 UTF-8 bytes before hashing. The raw password is never retained after
   the request.
 - There is no separate Profile row: public fields share the account lifecycle.
 - There is no account-status, refresh-token, session, credential-history, or count column.

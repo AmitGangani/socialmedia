@@ -530,7 +530,7 @@ components:
     RegisterRequest:
       type: object
       additionalProperties: false
-      required: [email, username, displayName, bio, password]
+      required: [email, username, displayName, password]
       properties:
         email:
           type: string
@@ -544,15 +544,14 @@ components:
         displayName:
           type: string
           minLength: 1
-          maxLength: 50
+          maxLength: 80
         bio:
           type: string
-          minLength: 1
           maxLength: 160
         password:
           type: string
           format: password
-          minLength: 8
+          minLength: 12
           description: Maximum 72 UTF-8 bytes; never logged or returned
     LoginRequest:
       type: object

@@ -1,0 +1,118 @@
+@gateway = http://localhost:8080
+@aliceEmail = alice@example.test
+@aliceUsername = Alice
+@alicePassword = correct-horse-battery
+@bobEmail = bob@example.test
+@bobUsername = Bob
+@bobPassword = another-correct-horse
+
+### Register Alice
+# @name registerAlice
+POST {{gateway}}/api/v1/auth/register
+Content-Type: application/json
+X-Correlation-Id: scenario1-register-alice
+
+{
+  "email": "{{aliceEmail}}",
+  "username": "{{aliceUsername}}",
+  "displayName": "Alice Example",
+  "bio": "Learning service boundaries",
+  "password": "{{alicePassword}}"
+}
+
+> {%
+client.global.set("aliceId", response.body.id);
+%}
+
+### Register Bob
+# @name registerBob
+POST {{gateway}}/api/v1/auth/register
+Content-Type: application/json
+X-Correlation-Id: scenario1-register-bob
+
+{
+  "email": "{{bobEmail}}",
+  "username": "{{bobUsername}}",
+  "displayName": "Bob Example",
+  "bio": "Publishing small posts",
+  "password": "{{bobPassword}}"
+}
+
+> {%
+client.global.set("bobId", response.body.id);
+%}
+
+### Login Alice
+# @name loginAlice
+POST {{gateway}}/api/v1/auth/login
+Content-Type: application/json
+X-Correlation-Id: scenario1-login-alice
+
+{
+  "login": "alice",
+  "password": "{{alicePassword}}"
+}
+
+> {%
+client.global.set("aliceJwt", response.body.accessToken);
+%}
+
+### Login Bob by email
+# @name loginBob
+POST {{gateway}}/api/v1/auth/login
+Content-Type: application/json
+X-Correlation-Id: scenario1-login-bob
+
+{
+  "login": "BOB@EXAMPLE.TEST",
+  "password": "{{bobPassword}}"
+}
+
+> {%
+client.global.set("bobJwt", response.body.accessToken);
+%}
+
+### Alice - own account
+GET {{gateway}}/api/v1/users/me
+Authorization: Bearer {{aliceJwt}}
+X-Correlation-Id: scenario1-alice-self
+
+### Bob - public profile
+GET {{gateway}}/api/v1/profiles/bOb
+X-Correlation-Id: scenario1-bob-profile
+
+### Reject duplicate username ignoring case
+POST {{gateway}}/api/v1/auth/register
+Content-Type: application/json
+X-Correlation-Id: scenario1-duplicate-username
+
+{
+  "email": "alice-duplicate@example.test",
+  "username": "aLiCe",
+  "displayName": "Duplicate Alice",
+  "bio": "",
+  "password": "{{alicePassword}}"
+}
+
+### Reject duplicate email ignoring case
+POST {{gateway}}/api/v1/auth/register
+Content-Type: application/json
+X-Correlation-Id: scenario1-duplicate-email
+
+{
+  "email": "ALICE@EXAMPLE.TEST",
+  "username": "AliceDuplicate",
+  "displayName": "Duplicate Alice",
+  "bio": "",
+  "password": "{{alicePassword}}"
+}
+
+### Reject wrong credentials uniformly
+POST {{gateway}}/api/v1/auth/login
+Content-Type: application/json
+X-Correlation-Id: scenario1-wrong-password
+
+{
+  "login": "alice",
+  "password": "this-password-is-wrong"
+}

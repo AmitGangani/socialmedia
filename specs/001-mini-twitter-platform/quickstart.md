@@ -84,6 +84,27 @@ Expected:
 - Wrong login returns the same `401` shape regardless of which credential was wrong.
 - Every response contains `X-Correlation-Id`.
 
+### Recorded Phase 3 evidence (2026-07-19)
+
+The packaged jars were run against an isolated PostgreSQL 18 cluster with Eureka and Gateway.
+Docker was not used for this run because the host denied access to its Docker socket. The same
+version-controlled requests and public routes were used.
+
+| Observation | Recorded result |
+|---|---|
+| Register Alice and Bob | `201`; both IDs were UUIDv7 |
+| Login by normalized username and email | `200`; Bearer JWTs issued |
+| JWT policy | Claims were exactly `sub`, `iss`, `iat`, `exp`, `jti`; lifetime was 1,800 seconds |
+| Alice self view | `200`; email present; password/hash fields absent |
+| Bob public profile via mixed-case username | `200`; follower/following/post counts were `0/0/0`; email and hash absent |
+| Mixed-case duplicate username and email | `409` for each; rejected requests created no account rows |
+| Wrong password and unknown login | Identical `401` status, content type, and response-field shape |
+| Unknown registration field | `400` |
+| Canonical registration boundaries | 11-byte password `400`; 12-byte password with 80-code-point display name `201`; 73-byte password `400` |
+| Password persistence | All three committed rows contained BCrypt hashes and no submitted plaintext |
+| Correlation response | Every observed response returned the supplied `X-Correlation-Id` |
+| Post count dependency stopped | Public profile returned `503` in 1.09 seconds; no partial counts were returned |
+
 ## Scenario 2: Follow, publish, and fan-out-on-write
 
 1. Run `Alice follows Bob` twice.
