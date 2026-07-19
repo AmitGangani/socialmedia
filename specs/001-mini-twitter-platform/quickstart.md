@@ -145,6 +145,29 @@ Expected:
 - A malformed cursor or `size=101` returns `400`.
 - An empty timeline returns `200` with an empty `items` array.
 
+### Recorded Phase 5 fan-out and cursor evidence (2026-07-19)
+
+The isolated Compose environment ran PostgreSQL 17.5, Kafka 4.1.1, Eureka, Gateway, User,
+Post, Follow, and Timeline. Two hundred cursor-seed posts were submitted through Post's HTTP
+contract inside the private Compose network; no test source, assertion framework, or direct Post
+table insert was used.
+
+| Observation | Recorded result |
+|---|---|
+| First and repeated follow | `201` then `200`; both responses returned the same relationship ID |
+| Follow transition storage | One active edge; exactly three published outbox rows across create/remove/re-create (`2` created, `1` removed) |
+| Self-follow | `400`; no edge or outbox row was added |
+| Exact public-profile count | Bob's follower count was `1` after the committed edge |
+| Publish command latency | `201` in 18 ms; the corrected fan-out was visible in Alice's home timeline within 1.5 seconds |
+| Fan-out insert | Correlated Timeline log recorded one eligible follower and one duplicate-safe insert |
+| Bulk hydration | Each observed non-empty home request emitted one bulk-call log and returned one ordered page; the empty page emitted no bulk call |
+| Cursor traversal | Eleven pages traversed the 201-item saved dataset; all 201 IDs were unique |
+| Insert after first page | The newer post returned `201` and did not appear beyond the saved cursor boundary |
+| Cursor/page validation | Malformed cursor and `size=101` each returned `400` |
+| Reference storage | Alice owned 202 rows with 202 distinct post IDs after the newer post was materialized |
+| Deleted/missing omission | Deleting a materialized post returned `204`; the reference disappeared from Alice's page inside the 10-second window |
+| Empty owner page | A new user with no references received `200` with zero items and no Post hydration call |
+
 ## Scenario 4: Likes, replies, and parent deletion
 
 1. Run `Alice likes Bob post` twice.
@@ -220,6 +243,17 @@ Expected:
 - Replaying the older removal does not delete the post published after re-follow because cleanup
   is time-bounded.
 
+### Recorded Phase 5 unfollow/re-follow evidence (2026-07-19)
+
+| Observation | Recorded result |
+|---|---|
+| First and repeated unfollow | `204` then `204`; only the first transition emitted `follow.removed.v1` |
+| Cleanup visibility | The pre-unfollow post disappeared from the home timeline within 0.5 seconds |
+| Re-follow | `201`; the old post remained absent, proving no historical backfill |
+| New publication | A post published after re-follow became visible normally |
+| Old removal replay | Event `019f79af-0fff-7668-bef5-76ce9907ee00` was republished unchanged |
+| Time-bound safety | Alice had 202 entries before and after replay; all were newer than the old removal time |
+
 ## Scenario 6: Authorization and validation failures
 
 Run each collection request and inspect the resource afterward:
@@ -273,6 +307,19 @@ Expected:
 - Calls finish within the documented timeout; there is no HTTP retry storm.
 - Unrelated account/follow/notification capabilities remain running.
 - After the breaker recovery interval and a successful probe, the same page returns normally.
+
+### Recorded Phase 5 dependency evidence (2026-07-19)
+
+With a non-empty home timeline, Post Service was stopped independently. The request returned
+`503` in 3.03 seconds and the failure response had no `items` field, so no reference-only or
+partial page escaped. Post was restarted without restarting Timeline, Follow, User, Gateway,
+Kafka, or PostgreSQL; the same request recovered to `200` with 20 hydrated items.
+
+Timeline's bounded consumer failure path was also observed during implementation diagnosis:
+the initial attempt plus two one-second retries published the unchanged source record to
+`post-events.v1.timeline-dlt`. Its DLT headers retained event/correlation identity and original
+topic, partition, offset, timestamp, and consumer group while exception messages, causes, and
+stack traces were excluded. After correcting the JDBC timestamp binding, normal fan-out resumed.
 
 ## Scenario 8: Kafka DLT and idempotent replay
 
