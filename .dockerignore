@@ -1,0 +1,17 @@
+.git/
+.gitignore
+.dockerignore
+Dockerfile*
+**/target/
+*.log*
+.env
+.env.*
+!.env.example
+secrets/
+*.pem
+*.key
+*.p12
+*.jks
+.idea/
+.vscode/
+specs/

@@ -1,0 +1,293 @@
+asyncapi: 3.0.0
+info:
+  title: SocialMedia Kafka Contracts
+  version: 1.0.0
+  description: |
+    At-least-once JSON domain events. Post and Follow persist the event envelope in an outbox
+    with the domain change. Replays preserve eventId, message key, occurredAt, and correlationId.
+    Known duplicate events are no-ops; unknown event types fail to the receiving consumer's DLT.
+servers:
+  localKafka:
+    host: kafka:9092
+    protocol: kafka
+    description: Single-node local KRaft broker; replication factor one is not an HA claim.
+channels:
+  postEvents:
+    address: post-events.v1
+    description: Three partitions, seven-day retention, keyed by postId.
+    messages:
+      postPublished:
+        $ref: '#/components/messages/PostPublished'
+      postDeleted:
+        $ref: '#/components/messages/PostDeleted'
+  followEvents:
+    address: follow-events.v1
+    description: Three partitions, seven-day retention, keyed by `followerId:followedId`.
+    messages:
+      followCreated:
+        $ref: '#/components/messages/FollowCreated'
+      followRemoved:
+        $ref: '#/components/messages/FollowRemoved'
+  postTimelineDlt:
+    address: post-events.v1.timeline-dlt
+    description: Timeline failures; three partitions and 30-day retention.
+    messages:
+      failedPostEvent:
+        $ref: '#/components/messages/FailedEvent'
+  followTimelineDlt:
+    address: follow-events.v1.timeline-dlt
+    description: Timeline failures; three partitions and 30-day retention.
+    messages:
+      failedFollowEvent:
+        $ref: '#/components/messages/FailedEvent'
+  postNotificationDlt:
+    address: post-events.v1.notification-dlt
+    description: Notification failures; three partitions and 30-day retention.
+    messages:
+      failedPostEvent:
+        $ref: '#/components/messages/FailedEvent'
+  followNotificationDlt:
+    address: follow-events.v1.notification-dlt
+    description: Notification failures; three partitions and 30-day retention.
+    messages:
+      failedFollowEvent:
+        $ref: '#/components/messages/FailedEvent'
+operations:
+  postPublishesFacts:
+    action: send
+    channel:
+      $ref: '#/channels/postEvents'
+    messages:
+      - $ref: '#/channels/postEvents/messages/postPublished'
+      - $ref: '#/channels/postEvents/messages/postDeleted'
+  followPublishesFacts:
+    action: send
+    channel:
+      $ref: '#/channels/followEvents'
+    messages:
+      - $ref: '#/channels/followEvents/messages/followCreated'
+      - $ref: '#/channels/followEvents/messages/followRemoved'
+  timelineConsumesPostFacts:
+    action: receive
+    channel:
+      $ref: '#/channels/postEvents'
+    description: Consumer group `timeline-service-v1`; initial attempt plus two 1-second retries.
+    messages:
+      - $ref: '#/channels/postEvents/messages/postPublished'
+      - $ref: '#/channels/postEvents/messages/postDeleted'
+  timelineConsumesFollowFacts:
+    action: receive
+    channel:
+      $ref: '#/channels/followEvents'
+    description: Consumer group `timeline-service-v1`; created is a no-op, removed cleans entries.
+    messages:
+      - $ref: '#/channels/followEvents/messages/followCreated'
+      - $ref: '#/channels/followEvents/messages/followRemoved'
+  notificationConsumesPostFacts:
+    action: receive
+    channel:
+      $ref: '#/channels/postEvents'
+    description: Consumer group `notification-service-v1`; original posts/deletes are no-ops.
+    messages:
+      - $ref: '#/channels/postEvents/messages/postPublished'
+      - $ref: '#/channels/postEvents/messages/postDeleted'
+  notificationConsumesFollowFacts:
+    action: receive
+    channel:
+      $ref: '#/channels/followEvents'
+    description: Consumer group `notification-service-v1`; removed is a no-op.
+    messages:
+      - $ref: '#/channels/followEvents/messages/followCreated'
+      - $ref: '#/channels/followEvents/messages/followRemoved'
+components:
+  messages:
+    PostPublished:
+      name: post.published.v1
+      title: Post published
+      summary: One immutable original or reply became visible.
+      contentType: application/json
+      headers:
+        $ref: '#/components/schemas/EventHeaders'
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/EventEnvelope'
+          - type: object
+            properties:
+              eventType:
+                const: post.published.v1
+              payload:
+                $ref: '#/components/schemas/PostPublishedPayload'
+    PostDeleted:
+      name: post.deleted.v1
+      title: Post deleted
+      summary: An author made a post unavailable.
+      contentType: application/json
+      headers:
+        $ref: '#/components/schemas/EventHeaders'
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/EventEnvelope'
+          - type: object
+            properties:
+              eventType:
+                const: post.deleted.v1
+              payload:
+                $ref: '#/components/schemas/PostDeletedPayload'
+    FollowCreated:
+      name: follow.created.v1
+      title: Follow created
+      summary: A directional relationship became present.
+      contentType: application/json
+      headers:
+        $ref: '#/components/schemas/EventHeaders'
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/EventEnvelope'
+          - type: object
+            properties:
+              eventType:
+                const: follow.created.v1
+              payload:
+                $ref: '#/components/schemas/FollowCreatedPayload'
+    FollowRemoved:
+      name: follow.removed.v1
+      title: Follow removed
+      summary: A directional relationship became absent.
+      contentType: application/json
+      headers:
+        $ref: '#/components/schemas/EventHeaders'
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/EventEnvelope'
+          - type: object
+            properties:
+              eventType:
+                const: follow.removed.v1
+              payload:
+                $ref: '#/components/schemas/FollowRemovedPayload'
+    FailedEvent:
+      name: failed-event
+      title: Original event plus Spring Kafka failure headers
+      summary: The unchanged source key/value after bounded consumer attempts are exhausted.
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/EventEnvelope'
+  schemas:
+    UuidV7:
+      type: string
+      format: uuid
+      description: RFC 9562 UUID version 7 generated by the owning service.
+    EventHeaders:
+      type: object
+      additionalProperties: false
+      required: [eventId, eventType, correlationId]
+      properties:
+        eventId:
+          $ref: '#/components/schemas/UuidV7'
+        eventType:
+          type: string
+        correlationId:
+          type: string
+          minLength: 1
+          maxLength: 128
+    EventEnvelope:
+      type: object
+      additionalProperties: false
+      required:
+        - eventId
+        - eventType
+        - schemaVersion
+        - aggregateId
+        - occurredAt
+        - producer
+        - correlationId
+        - payload
+      properties:
+        eventId:
+          $ref: '#/components/schemas/UuidV7'
+        eventType:
+          type: string
+          enum:
+            - post.published.v1
+            - post.deleted.v1
+            - follow.created.v1
+            - follow.removed.v1
+        schemaVersion:
+          type: integer
+          const: 1
+        aggregateId:
+          $ref: '#/components/schemas/UuidV7'
+        occurredAt:
+          type: string
+          format: date-time
+        producer:
+          type: string
+          enum: [post-service, follow-service]
+        correlationId:
+          type: string
+          minLength: 1
+          maxLength: 128
+        payload:
+          type: object
+          description: One of the event-specific payloads selected by eventType.
+    PostPublishedPayload:
+      type: object
+      additionalProperties: false
+      required: [postId, authorId, publishedAt]
+      properties:
+        postId:
+          $ref: '#/components/schemas/UuidV7'
+        authorId:
+          $ref: '#/components/schemas/UuidV7'
+        publishedAt:
+          type: string
+          format: date-time
+        parentPostId:
+          oneOf:
+            - $ref: '#/components/schemas/UuidV7'
+            - type: 'null'
+        parentAuthorId:
+          oneOf:
+            - $ref: '#/components/schemas/UuidV7'
+            - type: 'null'
+      description: Parent fields are both null for an original and both present for a reply.
+    PostDeletedPayload:
+      type: object
+      additionalProperties: false
+      required: [postId, authorId, deletedAt]
+      properties:
+        postId:
+          $ref: '#/components/schemas/UuidV7'
+        authorId:
+          $ref: '#/components/schemas/UuidV7'
+        deletedAt:
+          type: string
+          format: date-time
+    FollowCreatedPayload:
+      type: object
+      additionalProperties: false
+      required: [relationshipId, followerId, followedId, followedAt]
+      properties:
+        relationshipId:
+          $ref: '#/components/schemas/UuidV7'
+        followerId:
+          $ref: '#/components/schemas/UuidV7'
+        followedId:
+          $ref: '#/components/schemas/UuidV7'
+        followedAt:
+          type: string
+          format: date-time
+    FollowRemovedPayload:
+      type: object
+      additionalProperties: false
+      required: [relationshipId, followerId, followedId, unfollowedAt]
+      properties:
+        relationshipId:
+          $ref: '#/components/schemas/UuidV7'
+        followerId:
+          $ref: '#/components/schemas/UuidV7'
+        followedId:
+          $ref: '#/components/schemas/UuidV7'
+        unfollowedAt:
+          type: string
+          format: date-time

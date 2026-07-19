@@ -1,0 +1,238 @@
+x-app-healthcheck: &app-healthcheck
+  test: ["CMD-SHELL", "wget -q -O - http://localhost:$${SERVER_PORT}/actuator/health | grep -q '\"status\":\"UP\"'"]
+  interval: 10s
+  timeout: 5s
+  retries: 12
+  start_period: 30s
+
+x-app-runtime: &app-runtime
+  restart: unless-stopped
+  init: true
+
+services:
+  postgres:
+    image: postgres:17.5-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?Copy .env.example to .env and set POSTGRES_ADMIN_PASSWORD}
+      POSTGRES_DB: postgres
+      USER_DB_PASSWORD: ${USER_DB_PASSWORD:?Set USER_DB_PASSWORD in .env}
+      POST_DB_PASSWORD: ${POST_DB_PASSWORD:?Set POST_DB_PASSWORD in .env}
+      FOLLOW_DB_PASSWORD: ${FOLLOW_DB_PASSWORD:?Set FOLLOW_DB_PASSWORD in .env}
+      TIMELINE_DB_PASSWORD: ${TIMELINE_DB_PASSWORD:?Set TIMELINE_DB_PASSWORD in .env}
+      NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:?Set NOTIFICATION_DB_PASSWORD in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infra/postgres/init-databases.sh:/docker-entrypoint-initdb.d/10-init-databases.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  kafka:
+    image: apache/kafka:4.1.1
+    restart: unless-stopped
+    environment:
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 20s
+
+  kafka-topic-init:
+    image: apache/kafka:4.1.1
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    volumes:
+      - ./infra/kafka/create-topics.sh:/opt/socialmedia/create-topics.sh:ro
+    entrypoint: ["/bin/sh", "/opt/socialmedia/create-topics.sh"]
+    restart: "no"
+
+  discovery-server:
+    <<: *app-runtime
+    image: socialmedia/discovery-server:local
+    build:
+      context: .
+      dockerfile: discovery-server/Dockerfile
+    environment:
+      SPRING_APPLICATION_NAME: discovery-server
+      SERVER_PORT: 8761
+    ports:
+      - "8761:8761"
+    healthcheck: *app-healthcheck
+
+  gateway:
+    <<: *app-runtime
+    image: socialmedia/gateway:local
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+    environment:
+      SPRING_APPLICATION_NAME: gateway
+      SERVER_PORT: 8080
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
+      JWT_PUBLIC_KEY_LOCATION: file:/run/secrets/jwt-public.pem
+    volumes:
+      - ${JWT_KEYS_DIRECTORY:-./secrets}:/run/secrets:ro
+    ports:
+      - "8080:8080"
+    healthcheck: *app-healthcheck
+
+  user-service:
+    <<: *app-runtime
+    image: socialmedia/user-service:local
+    build:
+      context: .
+      dockerfile: services/user-service/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    environment:
+      SPRING_APPLICATION_NAME: user-service
+      SERVER_PORT: 8081
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/user_db
+      SPRING_DATASOURCE_USERNAME: user_service
+      SPRING_DATASOURCE_PASSWORD: ${USER_DB_PASSWORD:?Set USER_DB_PASSWORD in .env}
+      JWT_PRIVATE_KEY_LOCATION: file:/run/secrets/jwt-private.pem
+      JWT_PUBLIC_KEY_LOCATION: file:/run/secrets/jwt-public.pem
+    volumes:
+      - ${JWT_KEYS_DIRECTORY:-./secrets}:/run/secrets:ro
+    healthcheck: *app-healthcheck
+
+  post-service:
+    <<: *app-runtime
+    image: socialmedia/post-service:local
+    build:
+      context: .
+      dockerfile: services/post-service/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka-topic-init:
+        condition: service_completed_successfully
+      discovery-server:
+        condition: service_healthy
+    environment:
+      SPRING_APPLICATION_NAME: post-service
+      SERVER_PORT: 8082
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/post_db
+      SPRING_DATASOURCE_USERNAME: post_service
+      SPRING_DATASOURCE_PASSWORD: ${POST_DB_PASSWORD:?Set POST_DB_PASSWORD in .env}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_PUBLIC_KEY_LOCATION: file:/run/secrets/jwt-public.pem
+    volumes:
+      - ${JWT_KEYS_DIRECTORY:-./secrets}:/run/secrets:ro
+    healthcheck: *app-healthcheck
+
+  follow-service:
+    <<: *app-runtime
+    image: socialmedia/follow-service:local
+    build:
+      context: .
+      dockerfile: services/follow-service/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka-topic-init:
+        condition: service_completed_successfully
+      discovery-server:
+        condition: service_healthy
+    environment:
+      SPRING_APPLICATION_NAME: follow-service
+      SERVER_PORT: 8083
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/follow_db
+      SPRING_DATASOURCE_USERNAME: follow_service
+      SPRING_DATASOURCE_PASSWORD: ${FOLLOW_DB_PASSWORD:?Set FOLLOW_DB_PASSWORD in .env}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_PUBLIC_KEY_LOCATION: file:/run/secrets/jwt-public.pem
+    volumes:
+      - ${JWT_KEYS_DIRECTORY:-./secrets}:/run/secrets:ro
+    healthcheck: *app-healthcheck
+
+  timeline-service:
+    <<: *app-runtime
+    image: socialmedia/timeline-service:local
+    build:
+      context: .
+      dockerfile: services/timeline-service/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka-topic-init:
+        condition: service_completed_successfully
+      discovery-server:
+        condition: service_healthy
+    environment:
+      SPRING_APPLICATION_NAME: timeline-service
+      SERVER_PORT: 8084
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/timeline_db
+      SPRING_DATASOURCE_USERNAME: timeline_service
+      SPRING_DATASOURCE_PASSWORD: ${TIMELINE_DB_PASSWORD:?Set TIMELINE_DB_PASSWORD in .env}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_PUBLIC_KEY_LOCATION: file:/run/secrets/jwt-public.pem
+    volumes:
+      - ${JWT_KEYS_DIRECTORY:-./secrets}:/run/secrets:ro
+    healthcheck: *app-healthcheck
+
+  notification-service:
+    <<: *app-runtime
+    image: socialmedia/notification-service:local
+    build:
+      context: .
+      dockerfile: services/notification-service/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka-topic-init:
+        condition: service_completed_successfully
+      discovery-server:
+        condition: service_healthy
+    environment:
+      SPRING_APPLICATION_NAME: notification-service
+      SERVER_PORT: 8085
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/notification_db
+      SPRING_DATASOURCE_USERNAME: notification_service
+      SPRING_DATASOURCE_PASSWORD: ${NOTIFICATION_DB_PASSWORD:?Set NOTIFICATION_DB_PASSWORD in .env}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_PUBLIC_KEY_LOCATION: file:/run/secrets/jwt-public.pem
+    volumes:
+      - ${JWT_KEYS_DIRECTORY:-./secrets}:/run/secrets:ro
+    healthcheck: *app-healthcheck
+
+volumes:
+  postgres-data:
+  kafka-data:
