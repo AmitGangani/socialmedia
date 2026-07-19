@@ -114,16 +114,16 @@ delete, delete as owner, and confirm direct/profile views omit the post.
 
 ### Implementation for User Story 2
 
-- [ ] T048 [P] [US2] Implement the Post-owned outbox entity and due/status repository operations with targeted Lombok and no entity-wide string/equality generation in `services/post-service/src/main/java/com/example/socialmedia/post/domain/OutboxEvent.java` and `services/post-service/src/main/java/com/example/socialmedia/post/persistence/OutboxRepository.java`
-- [ ] T049 [P] [US2] Implement the local versioned Base64URL `(sortTime,id)` cursor codec with strict malformed/version rejection in `services/post-service/src/main/java/com/example/socialmedia/post/application/CursorCodec.java`
-- [ ] T050 [US2] Extend Post persistence with visible lookup, author-only soft deletion, deterministic author keysets, and bulk visible lookup methods in `services/post-service/src/main/java/com/example/socialmedia/post/persistence/PostRepository.java`
-- [ ] T051 [US2] Implement transactional original-post creation and deletion with UUIDv7 IDs, Unicode code-point validation, JWT-derived ownership, and same-transaction outbox records in `services/post-service/src/main/java/com/example/socialmedia/post/application/PostService.java`
-- [ ] T052 [US2] Extend public create/get/delete/profile-post and private bulk/count contracts with local Java records, page-size bounds, strict request fields, and Problem Details in `services/post-service/src/main/java/com/example/socialmedia/post/api/PostController.java`
-- [ ] T053 [US2] Implement the application-managed outbox poll/publish/ack flow with one-second polling, batches of 100, capped exponential retry, ten-attempt failure, sanitized errors, and retention cleanup in `services/post-service/src/main/java/com/example/socialmedia/post/integration/OutboxPublisher.java`
-- [ ] T054 [US2] Configure Post's Kafka JSON producer, scheduled publisher, UUIDv7 generation, and correlation propagation without a shared event library in `services/post-service/src/main/java/com/example/socialmedia/post/PostApplication.java`
-- [ ] T055 [US2] Add post boundary, listing, authorization, deletion, and no-edit requests to `http/socialmedia.http`
-- [ ] T056 [US2] Execute and record the standalone publish/retrieve/page/delete and validation evidence under Scenarios 4 and 6 in `specs/001-mini-twitter-platform/quickstart.md`
-- [ ] T057 [US2] Package Post Service without application tests and confirm the executable artifact excludes Lombok through `services/post-service/pom.xml`
+- [X] T048 [P] [US2] Implement the Post-owned outbox entity and due/status repository operations with targeted Lombok and no entity-wide string/equality generation in `services/post-service/src/main/java/com/example/socialmedia/post/domain/OutboxEvent.java` and `services/post-service/src/main/java/com/example/socialmedia/post/persistence/OutboxRepository.java`
+- [X] T049 [P] [US2] Implement the local versioned Base64URL `(sortTime,id)` cursor codec with strict malformed/version rejection in `services/post-service/src/main/java/com/example/socialmedia/post/application/CursorCodec.java`
+- [X] T050 [US2] Extend Post persistence with visible lookup, author-only soft deletion, deterministic author keysets, and bulk visible lookup methods in `services/post-service/src/main/java/com/example/socialmedia/post/persistence/PostRepository.java`
+- [X] T051 [US2] Implement transactional original-post creation and deletion with UUIDv7 IDs, Unicode code-point validation, JWT-derived ownership, and same-transaction outbox records in `services/post-service/src/main/java/com/example/socialmedia/post/application/PostService.java`
+- [X] T052 [US2] Extend public create/get/delete/profile-post and private bulk/count contracts with local Java records, page-size bounds, strict request fields, and Problem Details in `services/post-service/src/main/java/com/example/socialmedia/post/api/PostController.java`
+- [X] T053 [US2] Implement the application-managed outbox poll/publish/ack flow with one-second polling, batches of 100, capped exponential retry, ten-attempt failure, sanitized errors, and retention cleanup in `services/post-service/src/main/java/com/example/socialmedia/post/integration/OutboxPublisher.java`
+- [X] T054 [US2] Configure Post's Kafka JSON producer, scheduled publisher, UUIDv7 generation, and correlation propagation without a shared event library in `services/post-service/src/main/java/com/example/socialmedia/post/PostApplication.java`
+- [X] T055 [US2] Add post boundary, listing, authorization, deletion, and no-edit requests to `http/socialmedia.http`
+- [X] T056 [US2] Execute and record the standalone publish/retrieve/page/delete and validation evidence under Scenarios 4 and 6 in `specs/001-mini-twitter-platform/quickstart.md`
+- [X] T057 [US2] Package Post Service without application tests and confirm the executable artifact excludes Lombok through `services/post-service/pom.xml`
 
 **Checkpoint**: User Stories 1 and 2 work, and Post-owned events are durable even before consumers exist.
 

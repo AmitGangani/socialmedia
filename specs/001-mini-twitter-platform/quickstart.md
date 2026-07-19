@@ -163,6 +163,25 @@ Expected:
   `parent.available=false`, and new likes/replies return `404`.
 - Deleted content disappears from direct, profile-post, and timeline views within 10 seconds.
 
+### Recorded Phase 4 standalone post evidence (2026-07-19)
+
+The packaged Post Service was run against an isolated PostgreSQL 18 database. Kafka consumption,
+likes, replies, and Timeline propagation belong to later phases and are not claimed by this
+standalone evidence.
+
+| Observation | Recorded result |
+|---|---|
+| One-code-point original | `201`; returned ID was UUIDv7, exact text was preserved, and author matched JWT `sub` |
+| 280-code-point original | `201` for 280 astral Unicode code points; exact submitted text was returned |
+| Direct visible lookup | `200`; immutable fields were present and no edit field or edit route existed |
+| Stable profile-post keyset | Two `size=1` pages returned distinct IDs and the first page supplied an opaque cursor |
+| Non-author delete | `403`; a following direct lookup remained `200` |
+| Author delete and repeat | `204` then `204`; only the real transition created a deletion event |
+| Deleted visibility | Direct lookup returned `404`; profile list omitted the ID; bulk lookup returned only the remaining visible ID |
+| Atomic outbox state | Two committed posts produced two publication rows; one real delete produced one deletion row; all three retained the supplied correlation IDs |
+| Broker unavailable | All three rows remained `PENDING`; attempts advanced to `2`, next-attempt times backed off, and stored errors were exactly the sanitized `Kafka publish failed: TimeoutException` |
+| Packaging | Post Service package succeeded with no application tests; the executable jar contained no Lombok runtime entry |
+
 ## Scenario 4A: Notification timing measurement
 
 1. Prepare Alice and Bob plus ten visible Bob posts. Ensure Alice is not following Bob before
@@ -220,6 +239,19 @@ Expected:
 - Notification retrieval has no target-user input and returns only the JWT subject's rows.
 - Post boundaries match the contract exactly.
 - Invalid credentials are `401` and no protected state changes.
+
+### Recorded Phase 4 post-validation evidence (2026-07-19)
+
+| Request | Recorded result |
+|---|---|
+| Whitespace-only text | `400 application/problem+json` |
+| 281 astral Unicode code points | `400 application/problem+json` |
+| Client-supplied `authorId` | `400 application/problem+json`; no Post or outbox row was created |
+| Malformed cursor | `400 application/problem+json` |
+| `size=101` | `400 application/problem+json` |
+| Missing JWT on publish | `401`; no Post or outbox row was created |
+| PATCH edit attempt | `405 application/problem+json` |
+| Correlation response | Every observed response returned the supplied `X-Correlation-Id` |
 
 ## Scenario 7: Timeline dependency failure and circuit breaker
 

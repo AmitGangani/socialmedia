@@ -1,4 +1,5 @@
 @gateway = http://localhost:8080
+@postService = http://localhost:8082
 @aliceEmail = alice@example.test
 @aliceUsername = Alice
 @alicePassword = correct-horse-battery
@@ -115,4 +116,162 @@ X-Correlation-Id: scenario1-wrong-password
 {
   "login": "alice",
   "password": "this-password-is-wrong"
+}
+
+### Bob publishes a one-code-point post
+# @name publishOneCodePoint
+POST {{gateway}}/api/v1/posts
+Authorization: Bearer {{bobJwt}}
+Content-Type: application/json
+X-Correlation-Id: scenario4-publish-one
+
+{
+  "text": "A"
+}
+
+> {%
+client.global.set("boundaryPostId", response.body.id);
+%}
+
+### Bob publishes a 280-code-point post
+# @name publishMaximumPost
+< {%
+request.variables.set("maximumPostText", "😀".repeat(280));
+%}
+POST {{gateway}}/api/v1/posts
+Authorization: Bearer {{bobJwt}}
+Content-Type: application/json
+X-Correlation-Id: scenario4-publish-280
+
+{
+  "text": "{{maximumPostText}}"
+}
+
+> {%
+client.global.set("originalPostId", response.body.id);
+%}
+
+### Retrieve Bob's visible post
+GET {{gateway}}/api/v1/posts/{{originalPostId}}
+X-Correlation-Id: scenario4-get-post
+
+### First Bob profile-post page
+# @name firstBobPostPage
+GET {{gateway}}/api/v1/users/{{bobId}}/posts?size=1
+X-Correlation-Id: scenario4-post-page-1
+
+> {%
+client.global.set("postCursor", response.body.nextCursor);
+%}
+
+### Next Bob profile-post page
+GET {{gateway}}/api/v1/users/{{bobId}}/posts?size=1&cursor={{postCursor}}
+X-Correlation-Id: scenario4-post-page-2
+
+### Reject an empty post
+POST {{gateway}}/api/v1/posts
+Authorization: Bearer {{bobJwt}}
+Content-Type: application/json
+X-Correlation-Id: scenario6-reject-empty-post
+
+{
+  "text": ""
+}
+
+### Reject a whitespace-only post
+POST {{gateway}}/api/v1/posts
+Authorization: Bearer {{bobJwt}}
+Content-Type: application/json
+X-Correlation-Id: scenario6-reject-blank-post
+
+{
+  "text": "   "
+}
+
+### Reject a 281-code-point post
+< {%
+request.variables.set("oversizedPostText", "😀".repeat(281));
+%}
+POST {{gateway}}/api/v1/posts
+Authorization: Bearer {{bobJwt}}
+Content-Type: application/json
+X-Correlation-Id: scenario6-reject-281
+
+{
+  "text": "{{oversizedPostText}}"
+}
+
+### Reject client-supplied ownership
+POST {{gateway}}/api/v1/posts
+Authorization: Bearer {{bobJwt}}
+Content-Type: application/json
+X-Correlation-Id: scenario6-reject-author-id
+
+{
+  "text": "Ownership must come from the JWT",
+  "authorId": "{{aliceId}}"
+}
+
+### Reject a malformed profile-post cursor
+GET {{gateway}}/api/v1/users/{{bobId}}/posts?cursor=not-a-cursor
+X-Correlation-Id: scenario6-reject-post-cursor
+
+### Reject an oversized profile-post page
+GET {{gateway}}/api/v1/users/{{bobId}}/posts?size=101
+X-Correlation-Id: scenario6-reject-post-size
+
+### Reject a protected publish without a JWT
+POST {{gateway}}/api/v1/posts
+Content-Type: application/json
+X-Correlation-Id: scenario6-reject-missing-jwt
+
+{
+  "text": "No anonymous publication"
+}
+
+### Alice cannot delete Bob's boundary post
+DELETE {{gateway}}/api/v1/posts/{{boundaryPostId}}
+Authorization: Bearer {{aliceJwt}}
+X-Correlation-Id: scenario6-reject-foreign-delete
+
+### The forbidden delete left the post visible
+GET {{gateway}}/api/v1/posts/{{boundaryPostId}}
+X-Correlation-Id: scenario6-post-still-visible
+
+### Bob deletes his boundary post
+DELETE {{gateway}}/api/v1/posts/{{boundaryPostId}}
+Authorization: Bearer {{bobJwt}}
+X-Correlation-Id: scenario4-owner-delete
+
+### Bob repeats the idempotent delete
+DELETE {{gateway}}/api/v1/posts/{{boundaryPostId}}
+Authorization: Bearer {{bobJwt}}
+X-Correlation-Id: scenario4-owner-delete-repeat
+
+### Deleted post is unavailable directly
+GET {{gateway}}/api/v1/posts/{{boundaryPostId}}
+X-Correlation-Id: scenario4-get-deleted
+
+### Deleted post is omitted from Bob's profile-post list
+GET {{gateway}}/api/v1/users/{{bobId}}/posts?size=20
+X-Correlation-Id: scenario4-list-after-delete
+
+### Internal bulk lookup omits the deleted post
+# Standalone/private-network validation only; Gateway intentionally does not route /internal/v1.
+POST {{postService}}/internal/v1/posts/bulk
+Content-Type: application/json
+X-Correlation-Id: scenario4-bulk-after-delete
+
+{
+  "postIds": ["{{boundaryPostId}}", "{{originalPostId}}"]
+}
+
+### No post-edit route exists
+PATCH {{gateway}}/api/v1/posts/{{originalPostId}}
+Authorization: Bearer {{bobJwt}}
+Content-Type: application/json
+X-Correlation-Id: scenario4-no-edit-route
+
+{
+  "text": "An edit must not be accepted"
 }
