@@ -43,4 +43,11 @@ public class Post {
     @Column(name = "deleted_at")
     @Getter
     private Instant deletedAt;
+
+    public Post(UUID id, UUID authorId, String text, Instant publishedAt) {
+        this.id = id;
+        this.authorId = authorId;
+        this.text = text;
+        this.publishedAt = publishedAt;
+    }
 }
