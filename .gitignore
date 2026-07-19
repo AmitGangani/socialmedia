@@ -1,0 +1,29 @@
+# Java and Maven outputs
+target/
+*.class
+*.jar
+*.log
+.mvn/timing.properties
+
+# Local IDE and operating-system files
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+
+# Local environment and generated credentials
+.env
+.env.*
+!.env.example
+secrets/
+*.pem
+*.key
+*.p12
+*.jks
+
+# Local runtime data
+data/
+logs/
