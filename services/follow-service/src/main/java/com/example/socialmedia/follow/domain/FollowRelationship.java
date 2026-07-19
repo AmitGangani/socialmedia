@@ -31,4 +31,11 @@ public class FollowRelationship {
     @Column(name = "followed_at", nullable = false, updatable = false)
     @Getter
     private Instant followedAt;
+
+    public FollowRelationship(UUID id, UUID followerId, UUID followedId, Instant followedAt) {
+        this.id = id;
+        this.followerId = followerId;
+        this.followedId = followedId;
+        this.followedAt = followedAt;
+    }
 }

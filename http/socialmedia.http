@@ -275,3 +275,100 @@ X-Correlation-Id: scenario4-no-edit-route
 {
   "text": "An edit must not be accepted"
 }
+
+### Alice follows Bob
+# @name followBob
+PUT {{gateway}}/api/v1/follows/{{bobId}}
+Authorization: Bearer {{aliceJwt}}
+X-Correlation-Id: scenario2-follow-bob
+
+> {%
+client.global.set("followRelationshipId", response.body.id);
+%}
+
+### Repeating Alice follows Bob is idempotent
+PUT {{gateway}}/api/v1/follows/{{bobId}}
+Authorization: Bearer {{aliceJwt}}
+X-Correlation-Id: scenario2-follow-bob-repeat
+
+### Reject Alice following herself
+PUT {{gateway}}/api/v1/follows/{{aliceId}}
+Authorization: Bearer {{aliceJwt}}
+X-Correlation-Id: scenario6-reject-self-follow
+
+### Bob publishes for Alice's home timeline
+# @name publishForTimeline
+POST {{gateway}}/api/v1/posts
+Authorization: Bearer {{bobJwt}}
+Content-Type: application/json
+X-Correlation-Id: scenario2-publish-fanout
+
+{
+  "text": "A post for the home timeline"
+}
+
+> {%
+client.global.set("timelinePostId", response.body.id);
+%}
+
+### Alice home timeline - first page
+# @name firstHomePage
+GET {{gateway}}/api/v1/timeline/home?size=20
+Authorization: Bearer {{aliceJwt}}
+X-Correlation-Id: scenario3-home-page-1
+
+> {%
+client.global.set("timelineCursor", response.body.nextCursor);
+%}
+
+### Alice home timeline - next stable page
+GET {{gateway}}/api/v1/timeline/home?size=20&cursor={{timelineCursor}}
+Authorization: Bearer {{aliceJwt}}
+X-Correlation-Id: scenario3-home-page-2
+
+### Reject malformed Timeline cursor
+GET {{gateway}}/api/v1/timeline/home?cursor=not-a-cursor
+Authorization: Bearer {{aliceJwt}}
+X-Correlation-Id: scenario3-malformed-timeline-cursor
+
+### Reject oversized Timeline page
+GET {{gateway}}/api/v1/timeline/home?size=101
+Authorization: Bearer {{aliceJwt}}
+X-Correlation-Id: scenario3-oversized-timeline-page
+
+### Alice unfollows Bob
+DELETE {{gateway}}/api/v1/follows/{{bobId}}
+Authorization: Bearer {{aliceJwt}}
+X-Correlation-Id: scenario5-unfollow-bob
+
+### Repeating Alice unfollows Bob is idempotent
+DELETE {{gateway}}/api/v1/follows/{{bobId}}
+Authorization: Bearer {{aliceJwt}}
+X-Correlation-Id: scenario5-unfollow-bob-repeat
+
+### Alice re-follows Bob without historical backfill
+PUT {{gateway}}/api/v1/follows/{{bobId}}
+Authorization: Bearer {{aliceJwt}}
+X-Correlation-Id: scenario5-refollow-bob
+
+### Bob publishes after Alice re-follows
+POST {{gateway}}/api/v1/posts
+Authorization: Bearer {{bobJwt}}
+Content-Type: application/json
+X-Correlation-Id: scenario5-publish-after-refollow
+
+{
+  "text": "Visible only after the new follow period begins"
+}
+
+### Verify the re-follow boundary in Alice's home timeline
+GET {{gateway}}/api/v1/timeline/home?size=20
+Authorization: Bearer {{aliceJwt}}
+X-Correlation-Id: scenario5-home-after-refollow
+
+### Timeline dependency failure (manual command)
+# Run `docker compose stop post-service`, execute the request below, then run
+# `docker compose start post-service` and repeat after Post is healthy.
+GET {{gateway}}/api/v1/timeline/home?size=20
+Authorization: Bearer {{aliceJwt}}
+X-Correlation-Id: scenario7-post-dependency
