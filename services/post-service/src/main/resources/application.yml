@@ -1,0 +1,69 @@
+spring:
+  application:
+    name: ${SPRING_APPLICATION_NAME:post-service}
+  threads:
+    virtual:
+      enabled: true
+  main:
+    keep-alive: true
+    banner-mode: "off"
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/post_db}
+    username: ${SPRING_DATASOURCE_USERNAME:post_service}
+    password: ${SPRING_DATASOURCE_PASSWORD:change-me-post}
+    hikari:
+      connection-timeout: 2000
+  flyway:
+    enabled: true
+    validate-on-migrate: true
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          public-key-location: ${JWT_PUBLIC_KEY_LOCATION:file:./secrets/jwt-public.pem}
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+  task:
+    scheduling:
+      pool:
+        size: 1
+      thread-name-prefix: post-outbox-
+
+server:
+  port: ${SERVER_PORT:8082}
+
+eureka:
+  client:
+    register-with-eureka: true
+    fetch-registry: true
+    service-url:
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+
+security:
+  jwt:
+    issuer: ${JWT_ISSUER:socialmedia-user-service}
+    public-key-location: ${JWT_PUBLIC_KEY_LOCATION:file:./secrets/jwt-public.pem}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never

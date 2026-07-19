@@ -3,6 +3,8 @@
 .dockerignore
 Dockerfile*
 **/target/
+*.class
+*.jar
 *.log*
 .env
 .env.*
@@ -12,6 +14,12 @@ secrets/
 *.key
 *.p12
 *.jks
+coverage/
 .idea/
 .vscode/
+*.iml
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
 specs/

@@ -1,0 +1,12 @@
+<configuration>
+    <springProperty scope="context" name="serviceName" source="spring.application.name" defaultValue="user-service"/>
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%date{ISO8601} level=%level service=${serviceName} operation="%X{operation:-startup}" correlationId=%X{correlationId:-none} logger=%logger{36} message=%msg%n</pattern>
+        </encoder>
+    </appender>
+    <logger name="org.springframework.security" level="INFO"/>
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration>
