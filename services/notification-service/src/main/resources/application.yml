@@ -1,0 +1,65 @@
+spring:
+  application:
+    name: ${SPRING_APPLICATION_NAME:notification-service}
+  threads:
+    virtual:
+      enabled: true
+  main:
+    keep-alive: true
+    banner-mode: "off"
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/notification_db}
+    username: ${SPRING_DATASOURCE_USERNAME:notification_service}
+    password: ${SPRING_DATASOURCE_PASSWORD:change-me-notification}
+    hikari:
+      connection-timeout: 2000
+  flyway:
+    enabled: true
+    validate-on-migrate: true
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          public-key-location: ${JWT_PUBLIC_KEY_LOCATION:file:./secrets/jwt-public.pem}
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: notification-service-v1
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    listener:
+      ack-mode: record
+
+server:
+  port: ${SERVER_PORT:8085}
+
+eureka:
+  client:
+    register-with-eureka: true
+    fetch-registry: true
+    service-url:
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+
+security:
+  jwt:
+    issuer: ${JWT_ISSUER:socialmedia-user-service}
+    public-key-location: ${JWT_PUBLIC_KEY_LOCATION:file:./secrets/jwt-public.pem}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
