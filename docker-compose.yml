@@ -8,6 +8,8 @@ x-app-healthcheck: &app-healthcheck
 x-app-runtime: &app-runtime
   restart: unless-stopped
   init: true
+  networks:
+    - socialmedia-private
 
 services:
   postgres:
@@ -25,6 +27,8 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./infra/postgres/init-databases.sh:/docker-entrypoint-initdb.d/10-init-databases.sh:ro
+    networks:
+      - socialmedia-private
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
       interval: 5s
@@ -53,6 +57,8 @@ services:
       KAFKA_LOG_DIRS: /var/lib/kafka/data
     volumes:
       - kafka-data:/var/lib/kafka/data
+    networks:
+      - socialmedia-private
     healthcheck:
       test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
       interval: 5s
@@ -71,6 +77,8 @@ services:
       - ./infra/kafka/create-topics.sh:/opt/socialmedia/create-topics.sh:ro
     entrypoint: ["/bin/sh", "/opt/socialmedia/create-topics.sh"]
     restart: "no"
+    networks:
+      - socialmedia-private
 
   discovery-server:
     <<: *app-runtime
@@ -83,6 +91,9 @@ services:
       SERVER_PORT: 8761
     ports:
       - "8761:8761"
+    networks:
+      - socialmedia-edge
+      - socialmedia-private
     healthcheck: *app-healthcheck
 
   gateway:
@@ -103,6 +114,9 @@ services:
       - ${JWT_KEYS_DIRECTORY:-./secrets}:/run/secrets:ro
     ports:
       - "8080:8080"
+    networks:
+      - socialmedia-edge
+      - socialmedia-private
     healthcheck: *app-healthcheck
 
   user-service:
@@ -127,6 +141,8 @@ services:
       JWT_PUBLIC_KEY_LOCATION: file:/run/secrets/jwt-public.pem
     volumes:
       - ${JWT_KEYS_DIRECTORY:-./secrets}:/run/secrets:ro
+    group_add:
+      - ${JWT_KEYS_GID:?Set JWT_KEYS_GID in .env to the group ID that can read jwt-private.pem}
     healthcheck: *app-healthcheck
 
   post-service:
@@ -236,3 +252,10 @@ services:
 volumes:
   postgres-data:
   kafka-data:
+
+networks:
+  socialmedia-edge:
+    driver: bridge
+  socialmedia-private:
+    driver: bridge
+    internal: true

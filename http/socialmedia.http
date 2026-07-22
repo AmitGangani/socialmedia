@@ -372,3 +372,128 @@ X-Correlation-Id: scenario5-home-after-refollow
 GET {{gateway}}/api/v1/timeline/home?size=20
 Authorization: Bearer {{aliceJwt}}
 X-Correlation-Id: scenario7-post-dependency
+
+### Data runner - create 200 posts for stable Timeline traversal
+# Run this named request after Bob is logged in and eligible followers are present. IntelliJ's
+# HTTP Client expands the collection into 200 ordinary POST requests. There are no assertions,
+# test handlers, direct database writes, or test-framework dependencies.
+# @name seedTimelinePosts
+< {%
+const posts = Array.from({length: 200}, (_, offset) => {
+  const sequence = String(offset + 1).padStart(3, "0");
+  return {
+    text: `Timeline cursor seed ${sequence}`,
+    correlationId: `scenario3-seed-post-${sequence}`
+  };
+});
+request.variables.set("timelineSeedPosts", posts);
+if (request.iteration() > 0) {
+  await sleep(1050);
+}
+%}
+POST {{gateway}}/api/v1/posts
+Authorization: Bearer {{bobJwt}}
+Content-Type: application/json
+X-Correlation-Id: {{$.timelineSeedPosts[*].correlationId}}
+
+{
+  "text": "{{$.timelineSeedPosts[*].text}}"
+}
+
+### Data runner - register 1,000 follower accounts
+# Run the three high-follower requests in order. The first two authentication requests are
+# intentionally paced to the Gateway's documented ten-requests-per-minute local auth policy;
+# for a faster private-network demonstration, execute the same named requests with `gateway`
+# overridden to `http://user-service:8081` from an HTTP Client attached to the Compose network.
+# @name registerFanoutFollowers
+< {%
+const followers = Array.from({length: 1000}, (_, offset) => {
+  const sequence = String(offset + 1).padStart(4, "0");
+  return {
+    email: `fanout-${sequence}@example.test`,
+    username: `fanout${sequence}`,
+    displayName: `Fanout Follower ${sequence}`,
+    correlationId: `scenario9-register-${sequence}`
+  };
+});
+request.variables.set("fanoutFollowers", followers);
+if (request.iteration() > 0) {
+  await sleep(6100);
+}
+%}
+POST {{gateway}}/api/v1/auth/register
+Content-Type: application/json
+X-Correlation-Id: {{$.fanoutFollowers[*].correlationId}}
+
+{
+  "email": "{{$.fanoutFollowers[*].email}}",
+  "username": "{{$.fanoutFollowers[*].username}}",
+  "displayName": "{{$.fanoutFollowers[*].displayName}}",
+  "bio": "Scenario 9 fan-out data",
+  "password": "fanout-demo-password"
+}
+
+### Data runner - login 1,000 follower accounts and retain their JWTs
+# @name loginFanoutFollowers
+< {%
+const followers = Array.from({length: 1000}, (_, offset) => {
+  const sequence = String(offset + 1).padStart(4, "0");
+  return {
+    sequence: sequence,
+    username: `fanout${sequence}`,
+    correlationId: `scenario9-login-${sequence}`
+  };
+});
+request.variables.set("fanoutFollowers", followers);
+if (request.iteration() === 0) {
+  client.global.set("fanoutFollowerSessions", []);
+} else {
+  await sleep(6100);
+}
+%}
+POST {{gateway}}/api/v1/auth/login
+Content-Type: application/json
+X-Correlation-Id: {{$.fanoutFollowers[*].correlationId}}
+
+{
+  "login": "{{$.fanoutFollowers[*].username}}",
+  "password": "fanout-demo-password"
+}
+
+> {%
+const sessions = client.global.get("fanoutFollowerSessions") || [];
+const follower = request.variables.get("fanoutFollowers")[request.iteration()];
+sessions[request.iteration()] = {
+  username: follower.username,
+  accessToken: response.body.accessToken,
+  correlationId: `scenario9-follow-${follower.sequence}`
+};
+client.global.set("fanoutFollowerSessions", sessions);
+%}
+
+### Data runner - make all 1,000 accounts follow Bob
+# @name createFanoutFollows
+< {%
+request.variables.set(
+  "fanoutFollowerSessions",
+  client.global.get("fanoutFollowerSessions") || []
+);
+%}
+PUT {{gateway}}/api/v1/follows/{{bobId}}
+Authorization: Bearer {{$.fanoutFollowerSessions[*].accessToken}}
+X-Correlation-Id: {{$.fanoutFollowerSessions[*].correlationId}}
+
+### Publish once after the 1,000-follower runner
+# @name publishHighFollowerPost
+POST {{gateway}}/api/v1/posts
+Authorization: Bearer {{bobJwt}}
+Content-Type: application/json
+X-Correlation-Id: scenario9-high-follower-publish
+
+{
+  "text": "One publication amplified to 1,000 follower references"
+}
+
+> {%
+client.global.set("highFollowerPostId", response.body.id);
+%}
