@@ -178,13 +178,13 @@ zero cross-database or shared-model access.
 
 ### Implementation for User Story 6
 
-- [ ] T078 [P] [US6] Add request-only data-runner sections for 200 timeline posts and 1,000 follower accounts without assertions or a test framework in `http/socialmedia.http`
-- [ ] T079 [P] [US6] Add per-service health checks, persistent database storage, explicit private networking, and independent restart-safe service definitions in `docker-compose.yml`
-- [ ] T080 [US6] Complete correlation propagation from Gateway through RestClient calls, Post/Follow outboxes, Kafka envelopes/headers, Timeline consumption, and bulk hydration in `gateway/src/main/java/com/example/socialmedia/gateway/CorrelationIdFilter.java`, `services/user-service/src/main/java/com/example/socialmedia/user/UserApplication.java`, `services/post-service/src/main/java/com/example/socialmedia/post/integration/OutboxPublisher.java`, `services/follow-service/src/main/java/com/example/socialmedia/follow/integration/OutboxPublisher.java`, and `services/timeline-service/src/main/java/com/example/socialmedia/timeline/TimelineApplication.java`
-- [ ] T081 [P] [US6] Document the service boundary walkthrough, REST/Kafka hybrid, database ownership, fan-out-on-write/read comparison, failure behavior, and unsolved celebrity limitation in `specs/001-mini-twitter-platform/quickstart.md`
-- [ ] T082 [US6] Execute and record the 1,000-follower amplification and duplicate replay evidence under Scenario 9 in `specs/001-mini-twitter-platform/quickstart.md`
-- [ ] T083 [US6] Execute and record independent restart, Eureka re-registration, unrelated-service continuity, and 60-second recovery evidence under Scenario 10 in `specs/001-mini-twitter-platform/quickstart.md`
-- [ ] T084 [US6] Complete the ownership, contract isolation, internal-route, reference-only Timeline, and forbidden-scaffolding review in `specs/001-mini-twitter-platform/quickstart.md`
+- [X] T078 [P] [US6] Add request-only data-runner sections for 200 timeline posts and 1,000 follower accounts without assertions or a test framework in `http/socialmedia.http`
+- [X] T079 [P] [US6] Add per-service health checks, persistent database storage, explicit private networking, and independent restart-safe service definitions in `docker-compose.yml`
+- [X] T080 [US6] Complete correlation propagation from Gateway through RestClient calls, Post/Follow outboxes, Kafka envelopes/headers, Timeline consumption, and bulk hydration in `gateway/src/main/java/com/example/socialmedia/gateway/CorrelationIdFilter.java`, `services/user-service/src/main/java/com/example/socialmedia/user/UserApplication.java`, `services/post-service/src/main/java/com/example/socialmedia/post/integration/OutboxPublisher.java`, `services/follow-service/src/main/java/com/example/socialmedia/follow/integration/OutboxPublisher.java`, and `services/timeline-service/src/main/java/com/example/socialmedia/timeline/TimelineApplication.java`
+- [X] T081 [P] [US6] Document the service boundary walkthrough, REST/Kafka hybrid, database ownership, fan-out-on-write/read comparison, failure behavior, and unsolved celebrity limitation in `specs/001-mini-twitter-platform/quickstart.md`
+- [X] T082 [US6] Execute and record the 1,000-follower amplification and duplicate replay evidence under Scenario 9 in `specs/001-mini-twitter-platform/quickstart.md`
+- [X] T083 [US6] Execute and record independent restart, Eureka re-registration, unrelated-service continuity, and 60-second recovery evidence under Scenario 10 in `specs/001-mini-twitter-platform/quickstart.md`
+- [X] T084 [US6] Complete the ownership, contract isolation, internal-route, reference-only Timeline, and forbidden-scaffolding review in `specs/001-mini-twitter-platform/quickstart.md`
 
 **Checkpoint**: The architecture and Timeline tradeoff are reviewable without requiring a UI or orchestration platform.
 

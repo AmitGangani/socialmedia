@@ -19,14 +19,17 @@ From the repository root:
 
 ```bash
 cp .env.example .env
-mkdir -p .local/keys
-openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out .local/keys/private.pem
-openssl rsa -pubout -in .local/keys/private.pem -out .local/keys/public.pem
+mkdir -p secrets
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out secrets/jwt-private.pem
+openssl rsa -pubout -in secrets/jwt-private.pem -out secrets/jwt-public.pem
+chmod 640 secrets/jwt-private.pem
+chmod 644 secrets/jwt-public.pem
 ```
 
-Set the five database-role passwords and non-secret local settings in `.env`. Do not commit
-`.env` or `.local/keys`. Only User Service receives the private key; Gateway and domain services
-receive the public key.
+Set the five database-role passwords, set `JWT_KEYS_GID` to the output of `id -g`, and set other
+non-secret local values in `.env`. Do not commit `.env` or `secrets`. Only User Service receives
+the private key; Gateway and domain services receive the public key. User Service stays non-root
+and receives the host key's group as a supplemental group so `0640` remains sufficient.
 
 ## Build and start
 
@@ -343,6 +346,41 @@ Expected:
 
 No replay REST endpoint, DLT UI, or generic replay service is expected.
 
+## Architecture walkthrough: ownership and the Timeline tradeoff
+
+The public edge is deliberately small: Gateway validates JWTs, applies the local rate limit,
+creates or accepts `X-Correlation-Id`, and routes explicit `/api/v1` paths. It owns no domain
+state and never routes `/internal/v1`. Eureka supplies logical service locations; it is not a
+data store or an additional API boundary.
+
+| Responsibility | Owned state | Synchronous contracts | Asynchronous role |
+|---|---|---|---|
+| User | `Account` in `user_db` | Auth, self/profile, internal existence; composes exact counts | None |
+| Post | `Post`, `PostLike`, Post outbox in `post_db` | Post commands/queries, internal count and bulk hydration | Produces post facts after local commit |
+| Follow | `FollowRelationship`, Follow outbox in `follow_db` | Follow commands, internal counts and eligible-follower pages | Produces follow facts after local commit |
+| Timeline | Reference-only `TimelineEntry` in `timeline_db` | Home keyset page; one Post bulk call per non-empty page | Consumes post/follow facts idempotently |
+| Notification | `Notification` and `ProcessedEvent` in `notification_db` | JWT-subject notification page | Consumes relevant post/follow facts exactly once visibly |
+
+The primary flow is a REST/Kafka hybrid. A publish is an immediate REST command to Post; the
+post and its outbox row commit atomically, so the caller does not wait for fan-out. The outbox
+publisher emits the unchanged correlation ID in the JSON envelope and Kafka headers. Timeline
+consumes the fact, uses Follow's private paged REST contract to enumerate eligible followers,
+and stores only `(ownerUserId, postId, authorId, publishedAt)` references. A later home read is a
+keyset query followed by one bounded Post bulk request, which keeps Post as the content owner.
+
+| Choice | Publish/read cost | Data ownership and failure behavior |
+|---|---|---|
+| Implemented fan-out-on-write | Publication work grows with follower count; home reads are cheap and stable | Timeline owns duplicate-safe references only; failed Follow lookup retries then reaches its DLT |
+| Fan-out-on-read alternative | Publication is cheap; every home read repeatedly merges followed authors' posts | Requires more read-time graph/content work and makes bounded stable paging harder at this scope |
+| Celebrity hybrid (not implemented) | Would selectively avoid very large write amplification | Needs thresholds, job coordination, mixed read paths, and scaling policy not justified by this local baseline |
+
+Failure remains owner-specific. If Post is unavailable during hydration, Timeline returns a
+bounded `503` instead of leaking references or a partial page. Kafka delivery is at-least-once;
+Timeline's `(ownerUserId,postId)` uniqueness makes replay harmless. Restarting one responsibility
+does not redeploy the others, and its data survives in the PostgreSQL volume under its exclusive
+database role. The 1,000-follower scenario demonstrates linear write amplification; it does not
+claim to solve celebrity-scale fan-out, high availability, or horizontal publisher coordination.
+
 ## Scenario 9: High-follower tradeoff
 
 1. Use the HTTP collection's data-runner mode to create 1,000 follower accounts and make each
@@ -360,6 +398,24 @@ Expected:
 - Documentation explicitly labels slow publication/fan-out for celebrities as unsolved; there is
   no job coordinator, distributed lock, or hybrid celebrity path.
 
+### Recorded Phase 6 amplification and replay evidence (2026-07-20)
+
+The Compose environment used the request-only data runner shape: 1,000 accounts were registered
+and authenticated through User's public HTTP contract, each JWT subject followed the author
+through Gateway, and the measured publication also entered through Gateway. No direct table seed,
+assertion handler, test source, or load-test framework was used.
+
+| Observation | Recorded result |
+|---|---|
+| Eligible follower setup | `1,000` active Follow rows with `1,000` distinct follower IDs |
+| Measured post/event | Post `019f8046-84e0-72dd-8dd7-5c2939af41b2`; event `019f8046-8517-70cb-91ed-e7f8c09ded6f`; correlation `scenario9-high-follower-publish` |
+| Fan-out completion | First follower read contained the post about 3 seconds after publication began |
+| Write amplification | Ten eligible-follower pages of 100 each logged `inserted=100`; storage contained exactly `1,000` rows for `1,000` distinct owners |
+| Read cost | A non-empty follower page logged one bulk Post hydration call for its one returned reference |
+| Duplicate replay | The unchanged key/envelope/event ID was republished once; ten pages logged `inserted=0` and storage remained exactly `1,000` rows |
+| Correlation trace | `phase6-correlation-trace` appeared at Gateway routing, Post outbox publication, and all ten Timeline consumer pages; envelopes and Kafka headers carry the same value |
+| Celebrity limitation | Linear follower enumeration and inserts are visible; no coordinator, distributed lock, or hybrid read path is claimed |
+
 ## Scenario 10: Independent restart
 
 For each domain service in turn:
@@ -376,22 +432,55 @@ Expected:
 - Its owned capability becomes usable within 60 seconds.
 - Owned data remains because it lives in that service's exclusive database.
 
+### Recorded Phase 6 independent-restart evidence (2026-07-20)
+
+Each domain container was gracefully stopped and started alone so Eureka removal and subsequent
+registration could be observed separately. `healthy_registered` is measured from the individual
+service start; Eureka's removal view can lag shutdown by its local response-cache interval.
+
+| Service | Eureka removal observed | Healthy and registered | Unrelated services | Container/data identity |
+|---|---:|---:|---|---|
+| User | 15 s | 30 s | stayed running | same container and PostgreSQL volume |
+| Post | 29 s | 60 s | stayed running | same container and PostgreSQL volume |
+| Follow | 29 s | 60 s | stayed running | same container and PostgreSQL volume |
+| Timeline | 28 s | 60 s | stayed running | same container and PostgreSQL volume |
+| Notification | 29 s | 60 s | stayed running | same container and PostgreSQL volume |
+
+After all five restarts, Eureka again listed `USER-SERVICE`, `POST-SERVICE`, `FOLLOW-SERVICE`,
+`TIMELINE-SERVICE`, `NOTIFICATION-SERVICE`, and `API-GATEWAY`. The author's composed profile still
+reported `1,000` followers and two posts, the measured post remained directly visible, the first
+follower's hydrated Timeline still contained it, Notification health was `UP`, and the measured
+post still had `1,000` distinct Timeline owners.
+
 ## Architecture review checklist
 
-- [ ] Account exists only in `user_db`; Post/PostLike only in `post_db`; FollowRelationship only
+- [x] Account exists only in `user_db`; Post/PostLike only in `post_db`; FollowRelationship only
   in `follow_db`; TimelineEntry only in `timeline_db`; Notification/ProcessedEvent only in
   `notification_db`.
-- [ ] Each runtime datasource credential can connect only to its owned database.
-- [ ] No service imports another service's entity, repository, or DTO class.
-- [ ] Gateway exposes no `/internal/v1` route and owns no domain data.
-- [ ] Post/Follow domain writes and their outbox rows share one local transaction.
-- [ ] Kafka delivery is described as at-least-once; replays preserve event ID.
-- [ ] Timeline stores references only and makes one bulk Post call per non-empty page.
-- [ ] Correlation ID crosses REST and Kafka without secrets.
-- [ ] No generic CRUD base, mapper framework, single-use service interface, Config Server,
+- [x] Each runtime datasource credential can connect only to its owned database.
+- [x] No service imports another service's entity, repository, or DTO class.
+- [x] Gateway exposes no `/internal/v1` route and owns no domain data.
+- [x] Post/Follow domain writes and their outbox rows share one local transaction.
+- [x] Kafka delivery is described as at-least-once; replays preserve event ID.
+- [x] Timeline stores references only and makes one bulk Post call per non-empty page.
+- [x] Correlation ID crosses REST and Kafka without secrets.
+- [x] No generic CRUD base, mapper framework, single-use service interface, Config Server,
   feature flag, Redis, Schema Registry, CDC, tracing stack, or orchestration platform exists.
-- [ ] No automated test source, test-only dependency, runner, coverage tool, generated test
+- [x] No automated test source, test-only dependency, runner, coverage tool, generated test
   report, or CI application-test stage exists.
+
+### Recorded Phase 6 architecture review evidence (2026-07-20)
+
+- All five runtime roles connected to their owned database and were denied when attempting a
+  foreign database connection.
+- A source scan found zero cross-service Java imports, zero Gateway internal routes, and zero
+  copied content/profile/like fields in Timeline's migration.
+- Post and Follow application services place domain mutation and outbox persistence under the
+  same local `@Transactional` method.
+- The tracked tree contains zero `src/test` files, test dependencies, generic service/mapper
+  interfaces, generic CRUD bases, or forbidden infrastructure dependencies.
+- The live Compose view exposed only Gateway and Eureka, kept domain/infrastructure containers on
+  `socialmedia-private`, and retained PostgreSQL/Kafka named volumes across individual restarts.
 
 ## Stop the environment
 

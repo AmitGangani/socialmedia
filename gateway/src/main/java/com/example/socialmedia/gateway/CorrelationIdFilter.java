@@ -11,6 +11,8 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -21,6 +23,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class CorrelationIdFilter extends OncePerRequestFilter {
 
+    private static final Logger LOG = LoggerFactory.getLogger(CorrelationIdFilter.class);
     public static final String HEADER_NAME = "X-Correlation-Id";
     public static final String REQUEST_ATTRIBUTE = CorrelationIdFilter.class.getName() + ".value";
     private static final Pattern SAFE_VALUE = Pattern.compile("[A-Za-z0-9._:-]{1,128}");
@@ -36,6 +39,9 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
         MDC.put("correlationId", correlationId);
         MDC.put("operation", request.getMethod() + " " + request.getRequestURI());
         try {
+            if (request.getRequestURI().startsWith("/api/")) {
+                LOG.info("Routing method={} path={}", request.getMethod(), request.getRequestURI());
+            }
             filterChain.doFilter(wrappedRequest, response);
         }
         finally {
