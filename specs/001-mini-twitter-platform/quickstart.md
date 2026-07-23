@@ -249,6 +249,48 @@ Expected:
 - Any attempt that exceeds 10 seconds remains recorded as a failure; it is not silently retried or
   replaced in the evidence set.
 
+### Recorded Phase 8 notification evidence (2026-07-23)
+
+The Notification image was rebuilt and the Compose environment was started against its retained
+PostgreSQL and Kafka volumes. Two unique accounts isolated this run from earlier demonstration
+data. Each action used the public Gateway contract, and each matching recipient page was polled
+without blocking the Follow or Post command.
+
+| Attempt | Type | Source ID | Action response (ms) | Visible after response (ms) | Start-to-visible (ms) | Result |
+|---:|---|---|---:|---:|---:|---|
+| 1 | FOLLOW | `019f8ea5-2fdb-70aa-a16a-bf1472412e89` | 3,019 | 3,811 | 6,869 | PASS |
+| 2 | FOLLOW | `019f8ea5-4142-7051-bb40-c8dc70b9b97d` | 95 | 736 | 865 | PASS |
+| 3 | FOLLOW | `019f8ea5-44c2-7471-ad97-30ab152175dc` | 57 | 962 | 1,041 | PASS |
+| 4 | FOLLOW | `019f8ea5-48fd-7cf3-b1cd-87b8029d9e8c` | 46 | 928 | 992 | PASS |
+| 5 | FOLLOW | `019f8ea5-4d0b-7cd0-a02c-bdf38619a9d5` | 55 | 971 | 1,048 | PASS |
+| 6 | FOLLOW | `019f8ea5-5189-774b-80b1-49f0c20d5519` | 81 | 905 | 1,017 | PASS |
+| 7 | FOLLOW | `019f8ea5-5615-7203-bebf-4d29c414ea1c` | 118 | 753 | 915 | PASS |
+| 8 | FOLLOW | `019f8ea5-5a13-7bfa-b943-77add81c83bc` | 112 | 771 | 925 | PASS |
+| 9 | FOLLOW | `019f8ea5-5dde-7a5c-983c-e33cd12fd1d1` | 83 | 1,044 | 1,158 | PASS |
+| 10 | FOLLOW | `019f8ea5-626d-7b73-9361-b122d62ef612` | 61 | 919 | 998 | PASS |
+| 11 | REPLY | `019f8ea5-6686-76e2-9cb1-3b48f4961d5c` | 58 | 635 | 711 | PASS |
+| 12 | REPLY | `019f8ea5-6935-74d9-96b3-a95b2d97c16e` | 27 | 907 | 951 | PASS |
+| 13 | REPLY | `019f8ea5-6cf4-7e5a-a559-12507e9b7d62` | 33 | 1,221 | 1,270 | PASS |
+| 14 | REPLY | `019f8ea5-71ed-7ea9-98d3-fafc77bb1e72` | 31 | 907 | 953 | PASS |
+| 15 | REPLY | `019f8ea5-75b2-7101-8241-859eee9919d0` | 30 | 998 | 1,045 | PASS |
+| 16 | REPLY | `019f8ea5-79ee-7fad-9d66-f0998380b9c0` | 65 | 745 | 842 | PASS |
+| 17 | REPLY | `019f8ea5-7d3b-7041-9818-cef4c1484969` | 45 | 1,047 | 1,131 | PASS |
+| 18 | REPLY | `019f8ea5-81b1-7e48-9750-6cf7829468e8` | 48 | 1,080 | 1,160 | PASS |
+| 19 | REPLY | `019f8ea5-8643-7719-8cf5-d7c2cd9cecb3` | 44 | 666 | 738 | PASS |
+| 20 | REPLY | `019f8ea5-8925-74e1-a010-4a09d09edad5` | 31 | 1,201 | 1,255 | PASS |
+
+| Observation | Recorded result |
+|---|---|
+| Timing target | `20/20` matching notifications were visible within 10 seconds; the first follow included cold service-discovery/load-balancer resolution and still completed in 6.869 seconds |
+| Trigger independence | Every follow and reply returned before its matching notification became visible |
+| Recipient ownership | The recipient owned exactly 20 rows from the measured actions; the actor's JWT returned zero rows even when a recipient user ID was supplied as an extra query parameter and header |
+| Keyset retrieval | Two `size=7` pages returned 7 rows each with zero ID overlap; malformed cursor and `size=101` returned `400`, and a missing JWT returned `401` |
+| Self-reply | The valid self-reply event created one `processed_event` row, zero notification rows, and did not change the recipient's visible count |
+| Duplicate replay | The first follow's unchanged source key/envelope was republished twice; its visible-notification count and processed-event count remained `1/1` |
+| DLT handling | An unknown event produced exactly three listener failures (initial delivery plus two one-second retries) and then appeared unchanged in `post-events.v1.notification-dlt` |
+| DLT metadata | The DLT record retained original topic, partition, and offset headers; exception message, cause, and stack-trace headers remained excluded |
+| Correlation | Notification logs retained the source correlation ID for created, no-op, duplicate, and failed/DLT paths without logging event payload text |
+
 ## Scenario 5: Unfollow and re-follow boundary
 
 1. Run `Alice unfollows Bob` twice.
