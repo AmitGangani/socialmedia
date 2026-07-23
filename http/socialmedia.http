@@ -366,6 +366,89 @@ GET {{gateway}}/api/v1/timeline/home?size=20
 Authorization: Bearer {{aliceJwt}}
 X-Correlation-Id: scenario5-home-after-refollow
 
+### Bob follows Alice so Alice's reply is eligible for Bob's home timeline
+PUT {{gateway}}/api/v1/follows/{{aliceId}}
+Authorization: Bearer {{bobJwt}}
+X-Correlation-Id: scenario4-bob-follows-alice
+
+### Bob publishes the Phase 7 like/reply parent
+# @name publishInteractionParent
+POST {{gateway}}/api/v1/posts
+Authorization: Bearer {{bobJwt}}
+Content-Type: application/json
+X-Correlation-Id: scenario4-publish-interaction-parent
+
+{
+  "text": "A visible parent for the like and reply demonstration"
+}
+
+> {%
+client.global.set("interactionParentId", response.body.id);
+%}
+
+### Alice likes Bob's post
+PUT {{gateway}}/api/v1/posts/{{interactionParentId}}/likes/me
+Authorization: Bearer {{aliceJwt}}
+X-Correlation-Id: scenario4-like-parent
+
+### Repeating Alice's like is idempotent
+PUT {{gateway}}/api/v1/posts/{{interactionParentId}}/likes/me
+Authorization: Bearer {{aliceJwt}}
+X-Correlation-Id: scenario4-like-parent-repeat
+
+### Alice replies to Bob's post
+# @name createInteractionReply
+POST {{gateway}}/api/v1/posts/{{interactionParentId}}/replies
+Authorization: Bearer {{aliceJwt}}
+Content-Type: application/json
+X-Correlation-Id: scenario4-create-reply
+
+{
+  "text": "An immutable direct-parent reply"
+}
+
+> {%
+client.global.set("replyPostId", response.body.id);
+%}
+
+### Retrieve the visible reply and available parent
+GET {{gateway}}/api/v1/posts/{{replyPostId}}
+X-Correlation-Id: scenario4-get-reply-before-parent-delete
+
+### Poll Bob's home timeline for Alice's reply
+GET {{gateway}}/api/v1/timeline/home?size=20
+Authorization: Bearer {{bobJwt}}
+X-Correlation-Id: scenario4-reply-in-bob-timeline
+
+### Bob deletes the parent while preserving the reply
+DELETE {{gateway}}/api/v1/posts/{{interactionParentId}}
+Authorization: Bearer {{bobJwt}}
+X-Correlation-Id: scenario4-delete-interaction-parent
+
+### The reply survives with parent.available=false
+GET {{gateway}}/api/v1/posts/{{replyPostId}}
+X-Correlation-Id: scenario4-get-reply-after-parent-delete
+
+### Bob's timeline still hydrates the reply and its unavailable parent label
+GET {{gateway}}/api/v1/timeline/home?size=20
+Authorization: Bearer {{bobJwt}}
+X-Correlation-Id: scenario4-reply-after-parent-delete
+
+### Reject a new like against the deleted parent
+PUT {{gateway}}/api/v1/posts/{{interactionParentId}}/likes/me
+Authorization: Bearer {{aliceJwt}}
+X-Correlation-Id: scenario4-reject-like-deleted-parent
+
+### Reject a new reply against the deleted parent
+POST {{gateway}}/api/v1/posts/{{interactionParentId}}/replies
+Authorization: Bearer {{aliceJwt}}
+Content-Type: application/json
+X-Correlation-Id: scenario4-reject-reply-deleted-parent
+
+{
+  "text": "This reply must not be created"
+}
+
 ### Timeline dependency failure (manual command)
 # Run `docker compose stop post-service`, execute the request below, then run
 # `docker compose start post-service` and repeat after Post is healthy.

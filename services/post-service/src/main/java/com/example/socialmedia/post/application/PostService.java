@@ -3,14 +3,19 @@ package com.example.socialmedia.post.application;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import com.example.socialmedia.post.domain.OutboxEvent;
 import com.example.socialmedia.post.domain.Post;
 import com.example.socialmedia.post.persistence.OutboxRepository;
+import com.example.socialmedia.post.persistence.PostLikeRepository;
 import com.example.socialmedia.post.persistence.PostRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,6 +32,7 @@ public class PostService {
 
     private static final String POST_TOPIC = "post-events.v1";
     private final PostRepository postRepository;
+    private final PostLikeRepository postLikeRepository;
     private final OutboxRepository outboxRepository;
     private final CursorCodec cursorCodec;
     private final ObjectMapper objectMapper;
@@ -43,14 +49,40 @@ public class PostService {
                 "post.published.v1", POST_TOPIC, post.getId().toString(),
                 json(new PublishedPayload(post.getId(), authorId, publishedAt, null, null)),
                 publishedAt, correlationId));
-        return projection(post);
+        return projection(post, 0, false);
+    }
+
+    @Transactional
+    public PostResult createReply(UUID parentPostId, UUID authorId, String text,
+            String correlationId) {
+        validateText(text);
+        Post parent = postRepository.findVisibleByIdForUpdate(parentPostId)
+                .orElseThrow(PostService::notFound);
+        Instant publishedAt = now();
+        Post reply = new Post(uuidV7Generator.get(), authorId, text, publishedAt,
+                parent.getId(), parent.getAuthorId());
+        postRepository.save(reply);
+        outboxRepository.save(new OutboxEvent(uuidV7Generator.get(), reply.getId(),
+                "post.published.v1", POST_TOPIC, reply.getId().toString(),
+                json(new PublishedPayload(reply.getId(), authorId, publishedAt,
+                        parent.getId(), parent.getAuthorId())),
+                publishedAt, correlationId));
+        return projection(reply, 0, true);
+    }
+
+    @Transactional
+    public LikeResult like(UUID postId, UUID userId) {
+        postRepository.findVisibleByIdForUpdate(postId)
+                .orElseThrow(PostService::notFound);
+        postLikeRepository.insertIfAbsent(uuidV7Generator.get(), postId, userId, now());
+        return new LikeResult(postId, postLikeRepository.countByPostId(postId));
     }
 
     @Transactional(readOnly = true)
     public PostResult getVisible(UUID postId) {
-        return postRepository.findByIdAndDeletedAtIsNull(postId)
-                .map(PostService::projection)
+        Post post = postRepository.findByIdAndDeletedAtIsNull(postId)
                 .orElseThrow(PostService::notFound);
+        return projections(List.of(post)).getFirst();
     }
 
     @Transactional(readOnly = true)
@@ -63,7 +95,7 @@ public class PostService {
                 : postRepository.findVisibleAuthorPageAfter(authorId, cursor.sortTime(),
                         cursor.id(), pageRequest);
         boolean hasMore = rows.size() > size;
-        List<PostResult> items = rows.stream().limit(size).map(PostService::projection).toList();
+        List<PostResult> items = projections(rows.stream().limit(size).toList());
         String nextCursor = hasMore
                 ? cursorCodec.encode(items.getLast().publishedAt(), items.getLast().id()) : null;
         return new PostPage(items, nextCursor);
@@ -76,14 +108,13 @@ public class PostService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "postIds must contain between 1 and 100 unique IDs");
         }
-        return postRepository.findAllByIdInAndDeletedAtIsNull(postIds).stream()
-                .map(PostService::projection)
-                .toList();
+        return projections(postRepository.findAllByIdInAndDeletedAtIsNull(postIds));
     }
 
     @Transactional
     public void delete(UUID postId, UUID authorId, String correlationId) {
-        Post existing = postRepository.findById(postId).orElseThrow(PostService::notFound);
+        Post existing = postRepository.findByIdForUpdate(postId)
+                .orElseThrow(PostService::notFound);
         if (!existing.getAuthorId().equals(authorId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                     "Only the post author can delete this post");
@@ -126,9 +157,30 @@ public class PostService {
         }
     }
 
-    private static PostResult projection(Post post) {
+    private List<PostResult> projections(List<Post> posts) {
+        if (posts.isEmpty()) {
+            return List.of();
+        }
+        Set<UUID> postIds = posts.stream().map(Post::getId).collect(Collectors.toSet());
+        Map<UUID, Long> likeCounts = postLikeRepository.countByPostIds(postIds).stream()
+                .collect(Collectors.toMap(PostLikeRepository.PostLikeCount::getPostId,
+                        PostLikeRepository.PostLikeCount::getLikeCount));
+        Set<UUID> parentIds = posts.stream()
+                .map(Post::getParentPostId)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
+        Set<UUID> visibleParentIds = parentIds.isEmpty()
+                ? Collections.emptySet()
+                : new HashSet<>(postRepository.findVisibleIds(parentIds));
+        return posts.stream()
+                .map(post -> projection(post, likeCounts.getOrDefault(post.getId(), 0L),
+                        visibleParentIds.contains(post.getParentPostId())))
+                .toList();
+    }
+
+    private static PostResult projection(Post post, long likeCount, boolean parentAvailable) {
         return new PostResult(post.getId(), post.getAuthorId(), post.getText(),
-                post.getPublishedAt(), post.getParentPostId());
+                post.getPublishedAt(), post.getParentPostId(), parentAvailable, likeCount);
     }
 
     private static ResponseStatusException notFound() {
@@ -143,7 +195,10 @@ public class PostService {
     }
 
     public record PostResult(UUID id, UUID authorId, String text, Instant publishedAt,
-            UUID parentPostId) {
+            UUID parentPostId, boolean parentAvailable, long likeCount) {
+    }
+
+    public record LikeResult(UUID postId, long likeCount) {
     }
 
     public record PostPage(List<PostResult> items, String nextCursor) {

@@ -45,9 +45,16 @@ public class Post {
     private Instant deletedAt;
 
     public Post(UUID id, UUID authorId, String text, Instant publishedAt) {
+        this(id, authorId, text, publishedAt, null, null);
+    }
+
+    public Post(UUID id, UUID authorId, String text, Instant publishedAt,
+            UUID parentPostId, UUID parentAuthorId) {
         this.id = id;
         this.authorId = authorId;
         this.text = text;
         this.publishedAt = publishedAt;
+        this.parentPostId = parentPostId;
+        this.parentAuthorId = parentAuthorId;
     }
 }

@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -42,6 +43,24 @@ public class PostController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(PostView.from(postService.createOriginal(authorId, request.text(),
                         correlationId), authorId));
+    }
+
+    @PostMapping("/api/v1/posts/{parentPostId}/replies")
+    ResponseEntity<PostView> reply(@PathVariable UUID parentPostId,
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestHeader(CorrelationIdFilter.HEADER_NAME) String correlationId,
+            @Valid @RequestBody CreatePostRequest request) {
+        UUID authorId = UUID.fromString(jwt.getSubject());
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(PostView.from(postService.createReply(parentPostId, authorId,
+                        request.text(), correlationId), authorId));
+    }
+
+    @PutMapping("/api/v1/posts/{postId}/likes/me")
+    LikeResult like(@PathVariable UUID postId, @AuthenticationPrincipal Jwt jwt) {
+        PostService.LikeResult result = postService.like(postId,
+                UUID.fromString(jwt.getSubject()));
+        return new LikeResult(result.postId(), true, result.likeCount());
     }
 
     @GetMapping("/api/v1/posts/{postId}")
@@ -94,12 +113,15 @@ public class PostController {
     record ParentReference(UUID postId, boolean available) {
     }
 
+    record LikeResult(UUID postId, boolean liked, long likeCount) {
+    }
+
     record PostView(UUID id, UUID authorId, String text, Instant publishedAt, boolean reply,
             ParentReference parent, long likeCount, boolean deletionAvailable) {
 
         private static PostView from(PostService.PostResult post, UUID viewerId) {
             return new PostView(post.id(), post.authorId(), post.text(), post.publishedAt(),
-                    post.parentPostId() != null, null, 0,
+                    post.parentPostId() != null, parentReference(post), post.likeCount(),
                     viewerId != null && viewerId.equals(post.authorId()));
         }
     }
@@ -109,8 +131,13 @@ public class PostController {
 
         private static PostSummary from(PostService.PostResult post) {
             return new PostSummary(post.id(), post.authorId(), post.text(), post.publishedAt(),
-                    post.parentPostId() != null, null, 0);
+                    post.parentPostId() != null, parentReference(post), post.likeCount());
         }
+    }
+
+    private static ParentReference parentReference(PostService.PostResult post) {
+        return post.parentPostId() == null ? null
+                : new ParentReference(post.parentPostId(), post.parentAvailable());
     }
 
     record PostPage(List<PostView> items, String nextCursor) {

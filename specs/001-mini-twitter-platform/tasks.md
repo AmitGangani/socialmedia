@@ -201,13 +201,13 @@ or replies against the deleted parent.
 
 ### Implementation for User Story 4
 
-- [ ] T085 [P] [US4] Implement PostLike with UUIDv7 identity, unique `(postId,userId)`, targeted Lombok persistence annotations, and count lookup in `services/post-service/src/main/java/com/example/socialmedia/post/domain/PostLike.java` and `services/post-service/src/main/java/com/example/socialmedia/post/persistence/PostLikeRepository.java`
-- [ ] T086 [US4] Extend Post persistence for parent visibility, parent author snapshot, like insertion, and like counts without a denormalized counter in `services/post-service/src/main/java/com/example/socialmedia/post/persistence/PostRepository.java` and `services/post-service/src/main/java/com/example/socialmedia/post/persistence/PostLikeRepository.java`
-- [ ] T087 [US4] Implement transactional idempotent like and immutable reply creation, deleted-parent rejection, parent survival semantics, and reply `post.published.v1` outbox payloads in `services/post-service/src/main/java/com/example/socialmedia/post/application/PostService.java`
-- [ ] T088 [US4] Expose strict PUT-like and POST-reply contracts and parent-availability response fields in `services/post-service/src/main/java/com/example/socialmedia/post/api/PostController.java`
-- [ ] T089 [US4] Preserve reply labels, parent references, timeline ordering, and one-call hydration in `services/timeline-service/src/main/java/com/example/socialmedia/timeline/integration/PostClient.java` and `services/timeline-service/src/main/java/com/example/socialmedia/timeline/application/TimelineService.java`
-- [ ] T090 [US4] Add duplicate-like, reply, parent deletion, and deleted-parent rejection requests to `http/socialmedia.http`
-- [ ] T091 [US4] Execute and record like idempotency, reply visibility, parent deletion, and Timeline eligibility evidence under Scenario 4 in `specs/001-mini-twitter-platform/quickstart.md`
+- [X] T085 [P] [US4] Implement PostLike with UUIDv7 identity, unique `(postId,userId)`, targeted Lombok persistence annotations, and count lookup in `services/post-service/src/main/java/com/example/socialmedia/post/domain/PostLike.java` and `services/post-service/src/main/java/com/example/socialmedia/post/persistence/PostLikeRepository.java`
+- [X] T086 [US4] Extend Post persistence for parent visibility, parent author snapshot, like insertion, and like counts without a denormalized counter in `services/post-service/src/main/java/com/example/socialmedia/post/persistence/PostRepository.java` and `services/post-service/src/main/java/com/example/socialmedia/post/persistence/PostLikeRepository.java`
+- [X] T087 [US4] Implement transactional idempotent like and immutable reply creation, deleted-parent rejection, parent survival semantics, and reply `post.published.v1` outbox payloads in `services/post-service/src/main/java/com/example/socialmedia/post/application/PostService.java`
+- [X] T088 [US4] Expose strict PUT-like and POST-reply contracts and parent-availability response fields in `services/post-service/src/main/java/com/example/socialmedia/post/api/PostController.java`
+- [X] T089 [US4] Preserve reply labels, parent references, timeline ordering, and one-call hydration in `services/timeline-service/src/main/java/com/example/socialmedia/timeline/integration/PostClient.java` and `services/timeline-service/src/main/java/com/example/socialmedia/timeline/application/TimelineService.java`
+- [X] T090 [US4] Add duplicate-like, reply, parent deletion, and deleted-parent rejection requests to `http/socialmedia.http`
+- [X] T091 [US4] Execute and record like idempotency, reply visibility, parent deletion, and Timeline eligibility evidence under Scenario 4 in `specs/001-mini-twitter-platform/quickstart.md`
 
 **Checkpoint**: Likes and replies work without introducing another service, mutable post editing, or threaded ranking.
 

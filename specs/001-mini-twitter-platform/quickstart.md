@@ -208,6 +208,25 @@ standalone evidence.
 | Broker unavailable | All three rows remained `PENDING`; attempts advanced to `2`, next-attempt times backed off, and stored errors were exactly the sanitized `Kafka publish failed: TimeoutException` |
 | Packaging | Post Service package succeeded with no application tests; the executable jar contained no Lombok runtime entry |
 
+### Recorded Phase 7 like/reply evidence (2026-07-23)
+
+The version-controlled Scenario 4 request shapes were executed through Gateway against the
+Compose environment. Alice followed Bob so the parent was eligible for Alice's Timeline, and
+Bob followed Alice so Alice's reply was independently eligible for Bob's Timeline. Notification
+visibility remains a Phase 8 concern and is not claimed by this evidence.
+
+| Observation | Recorded result |
+|---|---|
+| Idempotent like | First and repeated `PUT .../likes/me` returned `200` with `likeCount=1`; `post_like` contained one row and one distinct liker; a separate liked reply exposed `likeCount=1` in direct and Timeline views |
+| Reply contract | Creation returned `201` with a UUIDv7 reply ID, `reply=true`, the direct parent ID, `parent.available=true`, `likeCount=0`, and JWT-derived ownership |
+| Atomic reply event | The reply's `post.published.v1` outbox row reached `PUBLISHED` and retained both `parentPostId` and the parent's author snapshot |
+| Timeline eligibility | The parent appeared for Alice on the third one-second poll and the reply appeared for Bob on the second; each observed non-empty page logged one bulk Post hydration call |
+| Parent deletion | Bob's delete returned `204`; direct reply retrieval remained `200` with the same parent ID and `parent.available=false` |
+| Deleted-parent rejection | A new like and a new reply against the deleted parent each returned `404`; no rejected reply/outbox row was created |
+| Timeline cleanup/survival | The parent reference was absent on Alice's first post-delete poll, while Bob still had exactly one reply reference hydrated with the unavailable-parent label |
+| Persistence evidence | The reply row retained its parent and parent-author IDs; Timeline storage contained one reply row and zero rows for the deleted parent |
+| Packaging | Clean Post and Timeline packages and both updated container images built successfully with application tests skipped and no test source present |
+
 ## Scenario 4A: Notification timing measurement
 
 1. Prepare Alice and Bob plus ten visible Bob posts. Ensure Alice is not following Bob before
