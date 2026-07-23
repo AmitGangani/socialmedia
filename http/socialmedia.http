@@ -449,6 +449,84 @@ X-Correlation-Id: scenario4-reject-reply-deleted-parent
   "text": "This reply must not be created"
 }
 
+### Poll Bob's notifications for Alice's follow and reply
+# Repeat for at most 10 seconds after the triggering action. The page is owned by Bob's JWT
+# subject; no target user identifier is accepted by the notification contract.
+# @name bobNotifications
+GET {{gateway}}/api/v1/notifications?size=20
+Authorization: Bearer {{bobJwt}}
+X-Correlation-Id: scenario4-poll-bob-notifications
+
+> {%
+client.global.set("notificationCursor", response.body.nextCursor);
+%}
+
+### Continue Bob's stable notification keyset
+GET {{gateway}}/api/v1/notifications?size=20&cursor={{notificationCursor}}
+Authorization: Bearer {{bobJwt}}
+X-Correlation-Id: scenario4-bob-notifications-next
+
+### Alice retrieves only Alice-owned notifications
+GET {{gateway}}/api/v1/notifications?size=20
+Authorization: Bearer {{aliceJwt}}
+X-Correlation-Id: scenario6-alice-notifications
+
+### A client-supplied target cannot expose Bob's notifications to Alice
+# The extra query/header are not contract inputs. The response remains Alice's JWT-subject page
+# and never contains Bob-owned rows.
+GET {{gateway}}/api/v1/notifications?size=20&userId={{bobId}}
+Authorization: Bearer {{aliceJwt}}
+X-Target-User-Id: {{bobId}}
+X-Correlation-Id: scenario6-reject-cross-user-notifications
+
+### Reject a malformed Notification cursor
+GET {{gateway}}/api/v1/notifications?cursor=not-a-cursor
+Authorization: Bearer {{bobJwt}}
+X-Correlation-Id: scenario6-reject-notification-cursor
+
+### Reject an oversized Notification page
+GET {{gateway}}/api/v1/notifications?size=101
+Authorization: Bearer {{bobJwt}}
+X-Correlation-Id: scenario6-reject-notification-size
+
+### Bob replies to Bob's own visible post without notifying himself
+# Run before deleting originalPostId. The reply succeeds normally, but its event is recorded as
+# processed without a visible notification because actor and recipient are the same.
+# @name createSelfReply
+POST {{gateway}}/api/v1/posts/{{originalPostId}}/replies
+Authorization: Bearer {{bobJwt}}
+Content-Type: application/json
+X-Correlation-Id: scenario4-self-reply-no-notification
+
+{
+  "text": "A valid self-reply that must not notify Bob"
+}
+
+> {%
+client.global.set("selfReplyPostId", response.body.id);
+%}
+
+### Notification DLT inspection and unchanged-event replay (manual commands)
+# 1. Publish a deliberately unknown event type to force the initial attempt plus two one-second
+#    retries and consumer-specific DLT publication:
+# docker compose exec -T kafka /opt/kafka/bin/kafka-console-producer.sh \
+#   --bootstrap-server kafka:9092 --topic post-events.v1 \
+#   --property parse.key=true --property key.separator='|' <<'EOF'
+# 019f0000-0000-7000-8000-000000000001|{"eventId":"019f0000-0000-7000-8000-000000000002","eventType":"post.unknown.v1","schemaVersion":1,"aggregateId":"019f0000-0000-7000-8000-000000000001","occurredAt":"2026-07-23T00:00:00Z","producer":"post-service","correlationId":"scenario8-notification-dlt","payload":{}}
+# EOF
+# 2. Inspect the unchanged key/value plus original topic/partition/offset headers. The command
+#    exits after one record:
+# docker compose exec -T kafka /opt/kafka/bin/kafka-console-consumer.sh \
+#   --bootstrap-server kafka:9092 --topic post-events.v1.notification-dlt \
+#   --from-beginning --max-messages 1 --property print.key=true --property print.headers=true
+# 3. For duplicate-safe replay, copy a real follow.created.v1 or reply-bearing
+#    post.published.v1 key/value from its source topic, then republish that exact line twice:
+# docker compose exec -T kafka /opt/kafka/bin/kafka-console-producer.sh \
+#   --bootstrap-server kafka:9092 --topic <source-topic> \
+#   --property parse.key=true --property key.separator='|'
+# Do not change eventId, occurredAt, correlationId, payload, or key. The recipient page and
+# processed_event/notification uniqueness remain unchanged after both replays.
+
 ### Timeline dependency failure (manual command)
 # Run `docker compose stop post-service`, execute the request below, then run
 # `docker compose start post-service` and repeat after Post is healthy.
