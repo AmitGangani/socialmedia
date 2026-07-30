@@ -30,25 +30,33 @@ channels:
         $ref: '#/components/messages/FollowRemoved'
   postTimelineDlt:
     address: post-events.v1.timeline-dlt
-    description: Timeline failures; three partitions and 30-day retention.
+    description: |
+      Timeline failures after the initial delivery and two one-second retries; three partitions
+      and 30-day retention. The source key/value and event identity are unchanged.
     messages:
       failedPostEvent:
         $ref: '#/components/messages/FailedEvent'
   followTimelineDlt:
     address: follow-events.v1.timeline-dlt
-    description: Timeline failures; three partitions and 30-day retention.
+    description: |
+      Timeline failures after the initial delivery and two one-second retries; three partitions
+      and 30-day retention. The source key/value and event identity are unchanged.
     messages:
       failedFollowEvent:
         $ref: '#/components/messages/FailedEvent'
   postNotificationDlt:
     address: post-events.v1.notification-dlt
-    description: Notification failures; three partitions and 30-day retention.
+    description: |
+      Notification failures after the initial delivery and two one-second retries; three
+      partitions and 30-day retention. The source key/value and event identity are unchanged.
     messages:
       failedPostEvent:
         $ref: '#/components/messages/FailedEvent'
   followNotificationDlt:
     address: follow-events.v1.notification-dlt
-    description: Notification failures; three partitions and 30-day retention.
+    description: |
+      Notification failures after the initial delivery and two one-second retries; three
+      partitions and 30-day retention. The source key/value and event identity are unchanged.
     messages:
       failedFollowEvent:
         $ref: '#/components/messages/FailedEvent'
@@ -170,8 +178,15 @@ components:
       title: Original event plus Spring Kafka failure headers
       summary: The unchanged source key/value after bounded consumer attempts are exhausted.
       contentType: application/json
+      headers:
+        $ref: '#/components/schemas/FailureHeaders'
       payload:
-        $ref: '#/components/schemas/EventEnvelope'
+        type: object
+        additionalProperties: true
+        description: |
+          The unchanged source JSON object. It is deliberately less restrictive than
+          EventEnvelope because unsupported event types and invalid envelope shapes are expected
+          reasons for DLT publication.
   schemas:
     UuidV7:
       type: string
@@ -190,6 +205,40 @@ components:
           type: string
           minLength: 1
           maxLength: 128
+    FailureHeaders:
+      type: object
+      additionalProperties: true
+      required:
+        - kafka_dlt-original-topic
+        - kafka_dlt-original-partition
+        - kafka_dlt-original-offset
+        - kafka_dlt-original-timestamp
+        - kafka_dlt-original-timestamp-type
+        - kafka_dlt-original-consumer-group
+        - kafka_dlt-exception-fqcn
+      properties:
+        kafka_dlt-original-topic:
+          type: string
+        kafka_dlt-original-partition:
+          type: integer
+          format: int32
+        kafka_dlt-original-offset:
+          type: integer
+          format: int64
+        kafka_dlt-original-timestamp:
+          type: integer
+          format: int64
+        kafka_dlt-original-timestamp-type:
+          type: string
+        kafka_dlt-original-consumer-group:
+          type: string
+          enum: [timeline-service-v1, notification-service-v1]
+        kafka_dlt-exception-fqcn:
+          type: string
+      description: |
+        Spring Kafka original-record metadata plus the retained source event headers. Exception
+        message, cause, and stack-trace headers are excluded; only the exception class name is
+        retained as sanitized failure classification.
     EventEnvelope:
       type: object
       additionalProperties: false
@@ -233,7 +282,7 @@ components:
     PostPublishedPayload:
       type: object
       additionalProperties: false
-      required: [postId, authorId, publishedAt]
+      required: [postId, authorId, publishedAt, parentPostId, parentAuthorId]
       properties:
         postId:
           $ref: '#/components/schemas/UuidV7'

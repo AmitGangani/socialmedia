@@ -50,7 +50,7 @@ explicit local-demo limitation.
 **Service Communication**: Versioned JSON REST under `/api/v1` and `/internal/v1`; Kafka
 JSON events on `post-events.v1` and `follow-events.v1` with documented versioned envelopes.
 
-**Manual Verification**: `http/socialmedia.http`, [quickstart.md](./quickstart.md), health
+**Manual Verification**: `postman/` Postman collection, [quickstart.md](./quickstart.md), health
 checks, correlation logs, cursor traversal, replay, failure, independent restart, and
 high-follower demonstrations. Automated application tests and test-only tooling are forbidden.
 
@@ -142,8 +142,10 @@ services/
 infra/
 ├── postgres/init-databases.sh  # creates five databases/roles from external env values
 └── kafka/create-topics.sh      # creates two source topics and four DLTs
-http/
-└── socialmedia.http           # version-controlled manual request collection
+postman/
+├── SocialMedia.postman_collection.json  # hand-curated manual request collection
+├── Local.postman_environment.json
+└── data/                                  # optional Runner CSVs (rate-limit / load)
 .env.example                    # names only; real local values stay uncommitted
 docker-compose.yml
 ```

@@ -10,7 +10,8 @@ test plan. Contract details live in [openapi.yaml](./contracts/openapi.yaml), ev
 - Java 21 and Maven 3.9+ for local packaging.
 - Docker Engine with Compose v2.
 - `openssl` for local RSA keys.
-- An HTTP client that runs the version-controlled `http/socialmedia.http` collection.
+- Postman (or a compatible client) that can import the version-controlled collection under
+  `postman/` (see also [Postman feature quickstart](../002-postman-collection/quickstart.md)).
 - Enough local resources for seven Java processes, PostgreSQL, Kafka, and the demo dataset.
 
 ## One-time local setup
@@ -58,8 +59,9 @@ ports are not public client entry points.
 
 ## Request collection variables
 
-Open `http/socialmedia.http` and set its local environment to `gateway=http://localhost:8080`.
-The collection captures:
+Import `postman/SocialMedia.postman_collection.json` and `postman/Local.postman_environment.json`
+into Postman, select environment **Local**, and confirm `gateway=http://localhost:8080`.
+Capture-only scripts populate:
 
 - Alice and Bob user IDs.
 - Alice and Bob JWTs.
@@ -67,7 +69,43 @@ The collection captures:
 - Original post ID, reply ID, and page cursors.
 - A caller-supplied `X-Correlation-Id` for the primary publish flow.
 
-JWTs and passwords are client variables only and must not appear in service logs.
+JWTs and passwords are client variables only and must not appear in service logs. Scripts do not
+assert pass/fail; verify responses manually against each request description.
+
+## Complete primary-flow walkthrough
+
+Run folder **`00 Happy Path`** in `postman/SocialMedia.postman_collection.json` top to bottom:
+
+1. `Register Alice`, `Register Bob`, `Login Alice`, and `Login Bob by email`.
+2. `Alice follows Bob`.
+3. `Bob publishes interaction parent`.
+4. Poll `Alice home timeline - first page` for at most 10 seconds, until it contains the captured
+   `interactionParentId`.
+5. Run `Alice replies to Bob's post`.
+6. Poll `Poll Bob's notifications` for at most 10 seconds, until FOLLOW has
+   `subjectId=followRelationshipId` and REPLY has `subjectId=replyPostId`.
+
+**Login-first re-run** (retained Compose volumes): skip register (or accept conflict), run both
+logins to refresh JWTs, then continue. Rotate Alice/Bob emails/usernames in the Local environment
+only when deliberately re-demonstrating registration. The collection captures all IDs and JWTs
+needed by later requests; no client-supplied actor or recipient ID is accepted by protected
+operations.
+
+### Recorded Phase 9 primary-flow evidence (2026-07-23)
+
+The rebuilt Compose environment was exercised through Gateway with fresh isolated accounts and
+the version-controlled request shapes above. No JWT or password was printed or recorded.
+
+| Observation | Recorded result |
+|---|---|
+| Registration and login | Alice/Bob returned `201/201`; both logins returned `200` |
+| Follow command | `201`; relationship `019f9024-ed8d-75b1-8dd4-7a942b9b5e79` |
+| Original publication | `201`; post `019f9024-eeb9-7997-ac9e-22b2b115867f`; response retained `phase9-primary-publish` |
+| Timeline consistency | Alice's page contained the post after `2,518 ms`, within the 10-second window |
+| Reply command | `201`; reply `019f9024-f935-72a6-bcc6-c49354b9743a` |
+| Notification consistency | Bob's page contained the matching FOLLOW and REPLY after `1,486 ms`, within the 10-second window |
+| Correlation trace | Gateway, both producer outboxes, Timeline, and Notification retained the `phase9-primary-*` correlation values |
+| Ownership inputs | Acting users came from Alice/Bob JWT subjects; notification retrieval used only Bob's JWT subject |
 
 ## Scenario 1: Account access and profile composition
 
@@ -351,6 +389,32 @@ Expected:
 | PATCH edit attempt | `405 application/problem+json` |
 | Correlation response | Every observed response returned the supplied `X-Correlation-Id` |
 
+### Recorded Phase 9 authorization and validation evidence (2026-07-23)
+
+Fresh isolated Alice/Bob accounts were exercised through Gateway against the full Compose stack.
+No JWT or password was recorded in service logs.
+
+| Request | Recorded result |
+|---|---|
+| Empty post text | `400 application/problem+json` |
+| Whitespace-only text | `400 application/problem+json` |
+| 1-code-point post | `201` |
+| 280 astral Unicode code points | `201`; exact submitted text returned |
+| 281 astral Unicode code points | `400 application/problem+json` |
+| Client-supplied `authorId` | `400`; ownership remains JWT `sub` only |
+| Alice delete of Bob's post | `403`; the post remained directly readable (`200`) |
+| Self-follow | `400`; no edge was created |
+| Missing JWT on publish | `401` |
+| Malformed JWT (`not.a.jwt`) | `401` |
+| Tampered JWT payload (valid shape, invalid signature) | `401` |
+| Zeroed JWT signature | `401` |
+| Expired RSA JWT (`exp` in the past) | `401` |
+| Malformed post/timeline/notification cursors | `400` each |
+| `size=101` on post list, timeline, and notifications | `400` each |
+| Alice notification page with `userId` / `X-Target-User-Id` for Bob | `200` with only Alice-owned rows (empty page; no Bob rows leaked) |
+| PATCH edit attempt | `405` |
+| Correlation echo | Login and subsequent responses returned the supplied `X-Correlation-Id` |
+
 ## Scenario 7: Timeline dependency failure and circuit breaker
 
 ```bash
@@ -385,6 +449,20 @@ the initial attempt plus two one-second retries published the unchanged source r
 topic, partition, offset, timestamp, and consumer group while exception messages, causes, and
 stack traces were excluded. After correcting the JDBC timestamp binding, normal fan-out resumed.
 
+### Recorded Phase 9 dependency and circuit-breaker evidence (2026-07-23)
+
+Alice's home timeline already contained three hydrated posts. Post Service was stopped alone.
+
+| Observation | Recorded result |
+|---|---|
+| Non-empty home while Post stopped | Five consecutive requests returned `503` |
+| First bounded failure latency | `3,056 ms` (within the two-second RestClient bound plus discovery overhead) |
+| Subsequent failures | About `1.0–2.1 s`; no partial `items` field appeared on any failure body |
+| Partial-page leakage | Failure bodies exposed only `timestamp`/`status`/`error`/`path`; no reference-only content |
+| Unrelated capabilities | Alice self-view remained `200`; follow command remained `200` while Post was down |
+| Recovery | `docker compose start post-service` restored the same home page to `200` with `3` hydrated items after Post was healthy and the bulk circuit recovered (about 74 s wall clock from restart) |
+| Other containers | Timeline, Follow, User, Notification, Gateway, Kafka, and PostgreSQL were not restarted |
+
 ## Scenario 8: Kafka DLT and idempotent replay
 
 1. Stop Follow Service, then publish as Bob while Alice follows him. Post creation must still
@@ -406,6 +484,24 @@ Expected:
 - The original correlation ID and event ID remain traceable end to end.
 
 No replay REST endpoint, DLT UI, or generic replay service is expected.
+
+### Recorded Phase 9 DLT and duplicate-replay evidence (2026-07-23)
+
+Follow Service was stopped while Alice still followed Bob. Bob published through Gateway with
+correlation `phase9-dlt-publish`. Publish still returned immediately (`201` in 179 ms) because
+fan-out is asynchronous.
+
+| Observation | Recorded result |
+|---|---|
+| Timeline retries | Exactly three listener failures (initial delivery plus two one-second retries) logged `ResourceAccessException` against Follow |
+| Timeline DLT record | Unchanged `post.published.v1` envelope for event `019f904a-4791-71af-988b-4944ecbd4a26` / post `019f904a-4778-7768-aa3b-666526f9a85c` appeared on `post-events.v1.timeline-dlt` |
+| DLT headers | Retained `eventId`, `eventType`, `correlationId=phase9-dlt-publish`, `kafka_dlt-original-topic=post-events.v1`, original partition/offset/timestamp, and `kafka_dlt-original-consumer-group=timeline-service-v1` |
+| Sanitized failure metadata | Headers included exception FQCN only; exception message, cause text, and stack-trace headers were absent from the inspected DLT record |
+| Follow restart + replay | After Follow was healthy and re-registered, the unchanged key/value was republished to `post-events.v1` |
+| First replay | Alice's home contained the post and `timeline_entry` count for that `post_id` became `1` within the 10-second window |
+| Second identical replay | `timeline_entry` count remained `1` (no duplicate visible entry) |
+| Notification side-effect of replay | Notification recorded `processed_event` for the same `eventId` once; no follower notification row is created for plain `post.published.v1` |
+| Notification unknown-type DLT | A deliberate `post.unknown.v1` with correlation `phase9-notification-dlt` produced three failures then an unchanged record on `post-events.v1.notification-dlt` (and Timeline's matching DLT) without payload-text logging |
 
 ## Architecture walkthrough: ownership and the Timeline tradeoff
 
@@ -477,6 +573,63 @@ assertion handler, test source, or load-test framework was used.
 | Correlation trace | `phase6-correlation-trace` appeared at Gateway routing, Post outbox publication, and all ten Timeline consumer pages; envelopes and Kafka headers carry the same value |
 | Celebrity limitation | Linear follower enumeration and inserts are visible; no coordinator, distributed lock, or hybrid read path is claimed |
 
+## Scenario 12: Gateway rate-limit exhaustion and one-minute refill
+
+Local per-instance Gateway buckets (FR-042 / SC-012 / US6 acceptance scenario 7):
+
+| Bucket | Capacity | Key | Routes |
+|---|---|---|---|
+| Authentication | 10 / minute | Client address | `POST /api/v1/auth/register`, `POST /api/v1/auth/login` |
+| Protected writes | 60 / minute | Authenticated JWT `sub` | `POST` / `PUT` / `PATCH` / `DELETE` public routes |
+
+Use folder **`06 Gateway Limits`** in `postman/SocialMedia.postman_collection.json` (dedicated
+rate-limit account, Runner data files `postman/data/auth-exhaust-11.csv` and
+`write-exhaust-61.csv`, rejected register/post probes, and post-refill requests). Bucket4j refills
+greedily (~1 auth token / 6 s, ~1 write token / s), so exhaustion must run as an uninterrupted
+burst; a slow serial client may never empty the write bucket.
+
+1. Wait at least one minute with no auth or protected-write traffic from the demo client/account.
+2. Register and log in the dedicated rate-limit subject; capture its JWT.
+3. Burst more than 10 wrong-password logins against the auth bucket; immediately attempt a unique
+   registration while exhausted.
+4. Confirm the unique username has no public profile and User Service logs do not show the rejected
+   correlation ID.
+5. Wait at least 60 seconds; repeat a wrong-password login (expect domain `401`, not `429`) and a
+   correct login (expect `200`).
+6. Burst more than 60 authenticated protected writes (idempotent `PUT /api/v1/follows/{bobId}` is
+   enough); immediately attempt a unique post while exhausted.
+7. Confirm the rejected marker text is absent from the author's posts and Post Service logs do not
+   show the rejected correlation ID.
+8. Wait at least 60 seconds; publish the refill marker post (expect `201`).
+
+Expected:
+
+- Exhausted matching requests return `429` with `application/problem+json`,
+  `X-RateLimit-Remaining: 0`, and the request correlation ID.
+- Rejected requests never reach the owning domain service and create no domain state.
+- After the one-minute refill window, matching auth and write requests succeed again.
+
+### Recorded Phase 10 rate-limit evidence (2026-07-24)
+
+Executed through Gateway (`localhost:8080`) against the full Compose stack with a dedicated
+subject `RateLimit1784867510` (`019f9264-e0ee-7886-b9bb-92fafbc13047`) and follow target
+`019f9264-df4a-7e80-bbd9-bed2cf4d8d90`. Exhaustion used multi-connection bursts so greedy refill
+could not keep the write bucket full.
+
+| Observation | Recorded result |
+|---|---|
+| Write burst | 70 parallel `PUT /api/v1/follows/{bobId}` in `1.034 s` → `60` × `200`, `10` × `429` |
+| Write sample `429` | `application/problem+json` body `{"type":"about:blank","title":"Too Many Requests","status":429,"correlationId":"scenario12-write-exhaust-21"}` with `X-RateLimit-Remaining: 0` |
+| Write rejected unique post | `POST /api/v1/posts` with text `RATE-LIMIT-REJECTED-MARKER-must-not-exist-v2` → `429`, `X-RateLimit-Remaining: 0` |
+| Write no domain change | Author post page had `item_count=2` and `marker_present=False` for the rejected v2 marker; prior non-exhausted markers only |
+| Write before domain routing | `post-service` logs had no `scenario12-write-rejected-post-v2`; `follow-service` logs had no `scenario12-write-exhaust-21` |
+| Write after refill (~65 s) | `POST` marker `RATE-LIMIT-REFILL-MARKER-must-exist-v2` → `201`, `X-RateLimit-Remaining: 59`, post id `019f9269-f820-7884-b0df-bd72c62d2d2c` |
+| Auth burst | 15 parallel wrong-password logins in `0.603 s` → `10` × `401`, `5` × `429` |
+| Auth sample `429` | `{"type":"about:blank","title":"Too Many Requests","status":429,"correlationId":"scenario12-auth-exhaust-04"}` with remaining `0` |
+| Auth rejected unique register | `POST /api/v1/auth/register` for `RateLimitRejected1784867846` → `429`, `X-RateLimit-Remaining: 0` |
+| Auth no domain change | `GET /api/v1/profiles/RateLimitRejected1784867846` → `404`; `user-service` logs had no `scenario12-auth-rejected-register` |
+| Auth after refill (~65 s) | Wrong-password login → `401` with `X-RateLimit-Remaining: 9` (domain reached); correct login for the demo subject → `200` with access token and `X-RateLimit-Remaining: 8` |
+
 ## Scenario 10: Independent restart
 
 For each domain service in turn:
@@ -542,6 +695,30 @@ post still had `1,000` distinct Timeline owners.
   interfaces, generic CRUD bases, or forbidden infrastructure dependencies.
 - The live Compose view exposed only Gateway and Eureka, kept domain/infrastructure containers on
   `socialmedia-private`, and retained PostgreSQL/Kafka named volumes across individual restarts.
+
+### Recorded Phase 9 production-source and constitution review (2026-07-23)
+
+A full production-source scan and live environment check were repeated after the complete
+baseline (US1–US6 plus polish packaging) was present.
+
+| Gate | Result | Evidence |
+|---|---|---|
+| Boundary / ownership | PASS | Zero cross-service Java package imports; each `application.yml` points at one owned JDBC database; Timeline migration stores only reference columns |
+| Database roles | PASS | Live roles `user_service`, `post_service`, `follow_service`, `timeline_service`, and `notification_service` connect to their owned databases and receive `FATAL: permission denied` / no `CONNECT` on foreign databases |
+| Contracts | PASS | Phase 9 primary-flow, Scenario 6 validation, Scenario 7 hydration failure, Scenario 8 DLT/replay, and Phase 10 Scenario 12 rate-limit `429`/`X-RateLimit-Remaining` evidence match the versioned OpenAPI/AsyncAPI contracts |
+| Stack / simplicity | PASS | No MapStruct/ModelMapper, no reactive `Mono`/`Flux` application code, no `@Data` on entities, no single-use service interfaces, no generic CRUD bases |
+| Resilience | PASS | One bulk Post breaker only; stopped-Post home pages return bounded `503` without partial items; Kafka uses initial delivery plus two retries then consumer-specific DLTs |
+| Observability | PASS | Correlation IDs crossed Gateway, publish, Timeline fan-out/failure/replay, and Notification unknown-type failure without logging JWTs, passwords, emails, or event payload text |
+| Security | PASS | Foreign delete `403`, impersonation fields `400`, invalid/expired/tampered JWTs `401`, notification pages ignore client-supplied target user inputs |
+| Delivery | PASS | Host-published ports remain Gateway `8080` and Eureka `8761` only; domain services stay on the private Compose network |
+| Verification policy | PASS | Zero `src/test` trees, zero `*Test.java`, zero test-scoped Maven dependencies, no CI application-test stage |
+| Forbidden scaffolding | PASS | No Config Server, Schema Registry, Redis, tracing stack, Kubernetes, feature flags, or CDC dependencies in production sources |
+
+Final manual acceptance: the packageable Compose environment demonstrates registration, login,
+follow, publish, timeline hydration, reply/notification consistency, authorization/validation
+boundaries, dependency isolation, DLT inspection, unchanged-event replay, Gateway rate-limit
+exhaustion and one-minute refill (`429` before domain routing), and independent service ownership
+without automated application tests.
 
 ## Stop the environment
 

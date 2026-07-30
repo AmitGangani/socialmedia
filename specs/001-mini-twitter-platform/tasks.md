@@ -246,16 +246,16 @@ and observe no duplicate visible rows.
 **Purpose**: Validate the complete system against contracts, security constraints, operational
 behavior, and the constitution without adding speculative infrastructure.
 
-- [ ] T103 [P] Reconcile implemented request/response status codes, required fields, cursor rules, and internal-only operations with `specs/001-mini-twitter-platform/contracts/openapi.yaml`
-- [ ] T104 [P] Reconcile implemented topic keys, envelopes, payloads, consumer groups, retry/DLT metadata, and replay identity rules with `specs/001-mini-twitter-platform/contracts/events.asyncapi.yaml`
-- [ ] T105 Package every module without application tests, inspect executable contents to confirm Lombok is absent at runtime, and record any build corrections in `pom.xml` and affected module `pom.xml` files
-- [ ] T106 Build and start all images, verify PostgreSQL/Kafka health ordering and Eureka registrations, and record environment corrections in `docker-compose.yml`
-- [ ] T107 Execute the complete registration-login-follow-publish-timeline-reply-notification flow in `http/socialmedia.http` and reconcile the runnable steps in `specs/001-mini-twitter-platform/quickstart.md`
-- [ ] T108 Execute authorization, strict-input, Unicode boundary, malformed cursor, and invalid-JWT scenarios and record evidence in `specs/001-mini-twitter-platform/quickstart.md`
-- [ ] T109 Execute Timeline's stopped-Post timeout/circuit-breaker/recovery scenario and record bounded `503` plus no-partial-page evidence in `specs/001-mini-twitter-platform/quickstart.md`
-- [ ] T110 Execute Kafka DLT inspection and unchanged-event duplicate replay for Timeline and Notification and record correlation/event identity evidence in `specs/001-mini-twitter-platform/quickstart.md`
-- [ ] T111 Review production sources for shared models, cross-database access, generic repositories, single-use interfaces, mapper frameworks, reactive code, secret logging, and automated-test artifacts; record the result in `specs/001-mini-twitter-platform/quickstart.md`
-- [ ] T112 Perform the final post-implementation constitution and service-ownership review and record all manual acceptance outcomes in `specs/001-mini-twitter-platform/quickstart.md`
+- [X] T103 [P] Reconcile implemented request/response status codes, required fields, cursor rules, and internal-only operations with `specs/001-mini-twitter-platform/contracts/openapi.yaml`
+- [X] T104 [P] Reconcile implemented topic keys, envelopes, payloads, consumer groups, retry/DLT metadata, and replay identity rules with `specs/001-mini-twitter-platform/contracts/events.asyncapi.yaml`
+- [X] T105 Package every module without application tests, inspect executable contents to confirm Lombok is absent at runtime, and record any build corrections in `pom.xml` and affected module `pom.xml` files
+- [X] T106 Build and start all images, verify PostgreSQL/Kafka health ordering and Eureka registrations, and record environment corrections in `docker-compose.yml`
+- [X] T107 Execute the complete registration-login-follow-publish-timeline-reply-notification flow in `http/socialmedia.http` and reconcile the runnable steps in `specs/001-mini-twitter-platform/quickstart.md`
+- [X] T108 Execute authorization, strict-input, Unicode boundary, malformed cursor, and invalid-JWT scenarios and record evidence in `specs/001-mini-twitter-platform/quickstart.md`
+- [X] T109 Execute Timeline's stopped-Post timeout/circuit-breaker/recovery scenario and record bounded `503` plus no-partial-page evidence in `specs/001-mini-twitter-platform/quickstart.md`
+- [X] T110 Execute Kafka DLT inspection and unchanged-event duplicate replay for Timeline and Notification and record correlation/event identity evidence in `specs/001-mini-twitter-platform/quickstart.md`
+- [X] T111 Review production sources for shared models, cross-database access, generic repositories, single-use interfaces, mapper frameworks, reactive code, secret logging, and automated-test artifacts; record the result in `specs/001-mini-twitter-platform/quickstart.md`
+- [X] T112 Perform the final post-implementation constitution and service-ownership review and record all manual acceptance outcomes in `specs/001-mini-twitter-platform/quickstart.md`
 
 **Checkpoint**: The complete baseline is packageable, locally reproducible, manually demonstrated, and constitution-compliant.
 
@@ -383,3 +383,16 @@ can proceed concurrently; US5 follows after both follow and reply facts exist.
   Redis, Schema Registry, CDC, tracing stacks, Kubernetes, or speculative extension points.
 - Preserve real local data during ordinary restart validation; destructive volume resets require
   an explicit separate action.
+
+---
+
+## Phase 10: Convergence
+
+**Purpose**: Close remaining gaps between the implemented baseline and unmet demonstration requirements discovered by converging the current code against `spec.md`, `plan.md`, and prior tasks.
+
+**Context**: Gateway rate limiting is implemented (`gateway/.../RateLimitConfig.java`) and OpenAPI documents `429`/`X-RateLimit-Remaining`, but the version-controlled request collection and quickstart lack runnable steps and recorded evidence for SC-012 and User Story 6 acceptance scenario 7.
+
+- [X] T113 Add Gateway rate-limit exhaustion and one-minute refill demonstration requests for the authentication bucket (10/min per client address) and protected-write bucket (60/min per authenticated account) to `http/socialmedia.http` per FR-042 / SC-012 / US6/AC7 (partial)
+- [X] T114 Execute the rate-limit demonstration, confirm `429` is returned before domain routing with no domain-state changes, confirm matching requests succeed after the one-minute refill window, and record the evidence as a quickstart scenario in `specs/001-mini-twitter-platform/quickstart.md` per SC-012 / US6/AC7 / FR-042 (partial)
+
+**Checkpoint**: Gateway rate limiting is manually demonstrable end-to-end with version-controlled requests and recorded outcomes.

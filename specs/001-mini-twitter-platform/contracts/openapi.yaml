@@ -35,6 +35,8 @@ paths:
           headers:
             X-Correlation-Id:
               $ref: '#/components/headers/CorrelationId'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimitRemaining'
           content:
             application/json:
               schema:
@@ -43,6 +45,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '409':
           $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
   /api/v1/auth/login:
     post:
       tags: [User]
@@ -61,12 +65,18 @@ paths:
           headers:
             X-Correlation-Id:
               $ref: '#/components/headers/CorrelationId'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimitRemaining'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/TokenResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
   /api/v1/users/me:
     get:
       tags: [User]
@@ -123,6 +133,8 @@ paths:
           headers:
             X-Correlation-Id:
               $ref: '#/components/headers/CorrelationId'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimitRemaining'
           content:
             application/json:
               schema:
@@ -131,6 +143,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
   /api/v1/posts/{postId}:
     parameters:
       - $ref: '#/components/parameters/PostId'
@@ -149,6 +163,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PostView'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
     delete:
@@ -161,12 +177,18 @@ paths:
           headers:
             X-Correlation-Id:
               $ref: '#/components/headers/CorrelationId'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimitRemaining'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
   /api/v1/posts/{postId}/likes/me:
     parameters:
       - $ref: '#/components/parameters/PostId'
@@ -180,14 +202,20 @@ paths:
           headers:
             X-Correlation-Id:
               $ref: '#/components/headers/CorrelationId'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimitRemaining'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/LikeResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
   /api/v1/posts/{parentPostId}/replies:
     parameters:
       - name: parentPostId
@@ -211,6 +239,8 @@ paths:
           headers:
             X-Correlation-Id:
               $ref: '#/components/headers/CorrelationId'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimitRemaining'
           content:
             application/json:
               schema:
@@ -221,10 +251,12 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
   /api/v1/users/{userId}/posts:
     parameters:
       - $ref: '#/components/parameters/UserId'
-      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/PostCursor'
       - $ref: '#/components/parameters/Size'
     get:
       tags: [Post]
@@ -257,12 +289,22 @@ paths:
       responses:
         '200':
           description: Relationship already existed
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimitRemaining'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/FollowView'
         '201':
           description: Relationship created with its outbox event
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimitRemaining'
           content:
             application/json:
               schema:
@@ -275,6 +317,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '503':
           $ref: '#/components/responses/Unavailable'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
     delete:
       tags: [Follow]
       operationId: unfollowUser
@@ -285,11 +329,15 @@ paths:
           headers:
             X-Correlation-Id:
               $ref: '#/components/headers/CorrelationId'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimitRemaining'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
   /api/v1/timeline/home:
     parameters:
-      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/TimelineCursor'
       - $ref: '#/components/parameters/Size'
     get:
       tags: [Timeline]
@@ -313,7 +361,7 @@ paths:
           $ref: '#/components/responses/Unavailable'
   /api/v1/notifications:
     parameters:
-      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/NotificationCursor'
       - $ref: '#/components/parameters/Size'
     get:
       tags: [Notification]
@@ -346,10 +394,15 @@ paths:
       responses:
         '200':
           description: Existence result
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ExistsResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
   /internal/v1/users/{userId}/follow-counts:
     parameters:
       - $ref: '#/components/parameters/UserId'
@@ -363,10 +416,15 @@ paths:
       responses:
         '200':
           description: Exact counts from Follow owner
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/FollowCounts'
+        '400':
+          $ref: '#/components/responses/BadRequest'
   /internal/v1/users/{userId}/followers:
     parameters:
       - $ref: '#/components/parameters/UserId'
@@ -376,7 +434,7 @@ paths:
         schema:
           type: string
           format: date-time
-      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/FollowerCursor'
       - $ref: '#/components/parameters/Size'
     get:
       tags: [Internal, Follow]
@@ -388,6 +446,9 @@ paths:
       responses:
         '200':
           description: Eligible follower IDs
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
           content:
             application/json:
               schema:
@@ -407,10 +468,15 @@ paths:
       responses:
         '200':
           description: Exact count from Post owner
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/PostCount'
+        '400':
+          $ref: '#/components/responses/BadRequest'
   /internal/v1/posts/bulk:
     post:
       tags: [Internal, Post]
@@ -428,6 +494,9 @@ paths:
       responses:
         '200':
           description: Unordered visible summaries; caller restores order and derives deletion availability from viewer/author IDs
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
           content:
             application/json:
               schema:
@@ -447,6 +516,12 @@ components:
         type: string
         minLength: 1
         maxLength: 128
+    RateLimitRemaining:
+      description: Tokens remaining in the current per-instance Gateway bucket
+      schema:
+        type: integer
+        format: int64
+        minimum: 0
   parameters:
     UserId:
       name: userId
@@ -469,13 +544,34 @@ components:
         minLength: 3
         maxLength: 30
         pattern: '^[A-Za-z0-9_]+$'
-    Cursor:
+    PostCursor:
       name: cursor
       in: query
       required: false
       schema:
         type: string
-      description: Opaque Base64URL versioned keyset; omit for first page
+      description: Opaque Base64URL version-1 `(sortTime,id)` keyset; omit for the first page
+    TimelineCursor:
+      name: cursor
+      in: query
+      required: false
+      schema:
+        type: string
+      description: Opaque Base64URL version-1 `(publishedAt,postId)` keyset; omit for the first page
+    NotificationCursor:
+      name: cursor
+      in: query
+      required: false
+      schema:
+        type: string
+      description: Opaque Base64URL version-1 `(eventTime,id)` keyset; omit for the first page
+    FollowerCursor:
+      name: cursor
+      in: query
+      required: false
+      schema:
+        type: string
+      description: Opaque Base64URL version-1 `(followedAt,followerId)` keyset; omit for the first page
     Size:
       name: size
       in: query
@@ -488,36 +584,65 @@ components:
   responses:
     BadRequest:
       description: Validation or malformed cursor failure
+      headers:
+        X-Correlation-Id:
+          $ref: '#/components/headers/CorrelationId'
       content:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/Problem'
     Unauthorized:
       description: Missing, expired, malformed, or invalid credential
+      headers:
+        X-Correlation-Id:
+          $ref: '#/components/headers/CorrelationId'
       content:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/Problem'
     Forbidden:
       description: Authenticated user does not own the requested action
+      headers:
+        X-Correlation-Id:
+          $ref: '#/components/headers/CorrelationId'
       content:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/Problem'
     NotFound:
       description: Resource is absent or unavailable because it was deleted
+      headers:
+        X-Correlation-Id:
+          $ref: '#/components/headers/CorrelationId'
       content:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/Problem'
     Conflict:
       description: Case-insensitive username or email conflict
+      headers:
+        X-Correlation-Id:
+          $ref: '#/components/headers/CorrelationId'
       content:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/Problem'
     Unavailable:
       description: Required owning service did not answer within the bounded policy
+      headers:
+        X-Correlation-Id:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    TooManyRequests:
+      description: The local per-instance Gateway token bucket is exhausted
+      headers:
+        X-Correlation-Id:
+          $ref: '#/components/headers/CorrelationId'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/RateLimitRemaining'
       content:
         application/problem+json:
           schema:
@@ -535,6 +660,7 @@ components:
         email:
           type: string
           format: email
+          minLength: 3
           maxLength: 254
         username:
           type: string
