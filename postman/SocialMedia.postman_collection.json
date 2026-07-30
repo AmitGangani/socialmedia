@@ -1,0 +1,2591 @@
+{
+  "info": {
+    "name": "SocialMedia",
+    "description": "# SocialMedia API Collection\n\nHand-curated Postman Collection v2.1 for local Gateway demos and manual verification.\n\n## Import\n1. Import this collection and `Local.postman_environment.json`\n2. Select environment **Local**\n3. Confirm `gateway` = `http://localhost:8080`\n\n## Required variables\n`gateway`, `aliceEmail`, `aliceUsername`, `alicePassword`, `bobEmail`, `bobUsername`, `bobPassword`, plus capture slots (`aliceId`, `bobId`, `aliceJwt`, `bobJwt`, post IDs, cursors).\n\n## First-time vs re-run\n- **First time**: run `00 Happy Path` top-to-bottom (includes register).\n- **Re-run (login-first)**: skip or ignore register conflicts; run Login Alice/Bob to refresh JWTs; continue social steps.\n\n## Scripts policy\nScripts are **capture-only** (`pm.environment.set`). No `pm.test` / pass-fail assertions. Expected outcomes are in each request description \u2014 verify responses manually.\n\n## Alice & Bob\nStable demo pair for follow/timeline/notifications. Dedicated rate-limit and fan-out identities live in optional folders.\n",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "socialmedia-platform-collection"
+  },
+  "item": [
+    {
+      "name": "00 Happy Path",
+      "description": "**Primary demo.** First-time: run all top-to-bottom. Re-run (login-first): skip Register if accounts exist (or accept 409), run Login Alice/Bob, continue. Capture-only scripts fill JWTs/IDs \u2014 do not paste tokens by hand.",
+      "item": [
+        {
+          "name": "Register Alice",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario1-register-alice",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/auth/register",
+            "description": "First-time only. Expect 201 and Alice account created. On re-run expect conflict if Alice exists \u2014 use Login Alice instead.\n\nCaptures: aliceId",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{aliceEmail}}\",\n  \"username\": \"{{aliceUsername}}\",\n  \"displayName\": \"Alice Example\",\n  \"bio\": \"Learning service boundaries\",\n  \"password\": \"{{alicePassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Capture-only: no pm.test assertions (constitution / FR-005)",
+                  "try {",
+                  "  var json = pm.response.json();",
+                  "  if (json.id !== undefined && json.id !== null) {",
+                  "    pm.environment.set(\"aliceId\", json.id);",
+                  "  }",
+                  "} catch (e) { /* non-JSON or empty body \u2014 leave env unchanged */ }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register Bob",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario1-register-bob",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/auth/register",
+            "description": "First-time only. Expect 201. On re-run use Login Bob.\n\nCaptures: bobId",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{bobEmail}}\",\n  \"username\": \"{{bobUsername}}\",\n  \"displayName\": \"Bob Example\",\n  \"bio\": \"Publishing small posts\",\n  \"password\": \"{{bobPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Capture-only: no pm.test assertions (constitution / FR-005)",
+                  "try {",
+                  "  var json = pm.response.json();",
+                  "  if (json.id !== undefined && json.id !== null) {",
+                  "    pm.environment.set(\"bobId\", json.id);",
+                  "  }",
+                  "} catch (e) { /* non-JSON or empty body \u2014 leave env unchanged */ }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login Alice",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario1-login-alice",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/auth/login",
+            "description": "Expect 200 and access token. **Default re-run start.**\n\nCaptures: aliceJwt (and aliceId if returned)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"login\": \"alice\",\n  \"password\": \"{{alicePassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Capture-only: no pm.test assertions (constitution / FR-005)",
+                  "try {",
+                  "  var json = pm.response.json();",
+                  "  if (json.accessToken !== undefined && json.accessToken !== null) {",
+                  "    pm.environment.set(\"aliceJwt\", json.accessToken);",
+                  "  }",
+                  "  if (json.id !== undefined && json.id !== null) {",
+                  "    pm.environment.set(\"aliceId\", json.id);",
+                  "  }",
+                  "} catch (e) { /* non-JSON or empty body \u2014 leave env unchanged */ }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login Bob by email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario1-login-bob",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/auth/login",
+            "description": "Expect 200. Login accepts email case-insensitively.\n\nCaptures: bobJwt (and bobId if returned)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"login\": \"BOB@EXAMPLE.TEST\",\n  \"password\": \"{{bobPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Capture-only: no pm.test assertions (constitution / FR-005)",
+                  "try {",
+                  "  var json = pm.response.json();",
+                  "  if (json.accessToken !== undefined && json.accessToken !== null) {",
+                  "    pm.environment.set(\"bobJwt\", json.accessToken);",
+                  "  }",
+                  "  if (json.id !== undefined && json.id !== null) {",
+                  "    pm.environment.set(\"bobId\", json.id);",
+                  "  }",
+                  "} catch (e) { /* non-JSON or empty body \u2014 leave env unchanged */ }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Alice follows Bob",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{aliceJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario2-follow-bob",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/follows/{{bobId}}",
+            "description": "Expect success creating follow relationship.\n\nCaptures: followRelationshipId"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Capture-only: no pm.test assertions (constitution / FR-005)",
+                  "try {",
+                  "  var json = pm.response.json();",
+                  "  if (json.id !== undefined && json.id !== null) {",
+                  "    pm.environment.set(\"followRelationshipId\", json.id);",
+                  "  }",
+                  "} catch (e) { /* non-JSON or empty body \u2014 leave env unchanged */ }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Bob publishes interaction parent",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bobJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario4-publish-interaction-parent",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/posts",
+            "description": "Expect 201. Parent post for like/reply/notification demo.\n\nCaptures: interactionParentId",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"A visible parent for the like and reply demonstration\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Capture-only: no pm.test assertions (constitution / FR-005)",
+                  "try {",
+                  "  var json = pm.response.json();",
+                  "  if (json.id !== undefined && json.id !== null) {",
+                  "    pm.environment.set(\"interactionParentId\", json.id);",
+                  "  }",
+                  "} catch (e) { /* non-JSON or empty body \u2014 leave env unchanged */ }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Alice home timeline - first page",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{aliceJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario3-home-page-1",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/timeline/home?size=20",
+            "description": "Expect 200. Poll until interactionParentId appears (typically within ~10s after publish).\n\nCaptures: timelineCursor when present"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Capture-only: no pm.test assertions (constitution / FR-005)",
+                  "try {",
+                  "  var json = pm.response.json();",
+                  "  if (json.nextCursor !== undefined && json.nextCursor !== null) {",
+                  "    pm.environment.set(\"timelineCursor\", json.nextCursor);",
+                  "  }",
+                  "} catch (e) { /* non-JSON or empty body \u2014 leave env unchanged */ }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Alice replies to Bob's post",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{aliceJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario4-create-reply",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/posts/{{interactionParentId}}/replies",
+            "description": "Expect 201 reply under interaction parent.\n\nCaptures: replyPostId",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"An immutable direct-parent reply\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Capture-only: no pm.test assertions (constitution / FR-005)",
+                  "try {",
+                  "  var json = pm.response.json();",
+                  "  if (json.id !== undefined && json.id !== null) {",
+                  "    pm.environment.set(\"replyPostId\", json.id);",
+                  "  }",
+                  "} catch (e) { /* non-JSON or empty body \u2014 leave env unchanged */ }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Poll Bob's notifications",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bobJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario4-poll-bob-notifications",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/notifications?size=20",
+            "description": "Expect 200. Poll up to ~10s until FOLLOW (followRelationshipId) and REPLY (replyPostId) appear for Bob.\n\nCaptures: notificationCursor when present"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Capture-only: no pm.test assertions (constitution / FR-005)",
+                  "try {",
+                  "  var json = pm.response.json();",
+                  "  if (json.nextCursor !== undefined && json.nextCursor !== null) {",
+                  "    pm.environment.set(\"notificationCursor\", json.nextCursor);",
+                  "  }",
+                  "} catch (e) { /* non-JSON or empty body \u2014 leave env unchanged */ }"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 Auth & Users",
+      "description": "Identity success and failure cases. Prefer Happy Path for register/login capture; these requests deepen auth demos.",
+      "item": [
+        {
+          "name": "Alice - own account",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{aliceJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario1-alice-self",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/users/me",
+            "description": "Expect 200 Alice profile for JWT subject."
+          },
+          "response": []
+        },
+        {
+          "name": "Bob - public profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario1-bob-profile",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/profiles/bOb",
+            "description": "Expect 200 public profile; username match is case-insensitive."
+          },
+          "response": []
+        },
+        {
+          "name": "Reject duplicate username",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario1-duplicate-username",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/auth/register",
+            "description": "Expect conflict/validation failure for duplicate username ignoring case.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"alice-duplicate@example.test\",\n  \"username\": \"aLiCe\",\n  \"displayName\": \"Duplicate Alice\",\n  \"bio\": \"\",\n  \"password\": \"{{alicePassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reject duplicate email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario1-duplicate-email",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/auth/register",
+            "description": "Expect conflict for duplicate email ignoring case.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"ALICE@EXAMPLE.TEST\",\n  \"username\": \"AliceDuplicate\",\n  \"displayName\": \"Duplicate Alice\",\n  \"bio\": \"\",\n  \"password\": \"{{alicePassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reject wrong credentials",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario1-wrong-password",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/auth/login",
+            "description": "Expect uniform auth failure (e.g. 401) without leaking which field failed.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"login\": \"alice\",\n  \"password\": \"this-password-is-wrong\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "02 Posts",
+      "description": "Publish, pagination, validation, authorization, delete idempotency, no-edit. Run after Bob is logged in.",
+      "item": [
+        {
+          "name": "Bob publishes one-code-point post",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bobJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario4-publish-one",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/posts",
+            "description": "Expect 201 for minimum valid post.\n\nCaptures: boundaryPostId",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"A\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Capture-only: no pm.test assertions (constitution / FR-005)",
+                  "try {",
+                  "  var json = pm.response.json();",
+                  "  if (json.id !== undefined && json.id !== null) {",
+                  "    pm.environment.set(\"boundaryPostId\", json.id);",
+                  "  }",
+                  "} catch (e) { /* non-JSON or empty body \u2014 leave env unchanged */ }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Bob publishes 280-code-point post",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bobJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario4-publish-280",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/posts",
+            "description": "Expect 201 for maximum 280 code points (emoji).\n\nCaptures: originalPostId",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"{{maximumPostText}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"maximumPostText\", \"\ud83d\ude00\".repeat(280));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Capture-only: no pm.test assertions (constitution / FR-005)",
+                  "try {",
+                  "  var json = pm.response.json();",
+                  "  if (json.id !== undefined && json.id !== null) {",
+                  "    pm.environment.set(\"originalPostId\", json.id);",
+                  "  }",
+                  "} catch (e) { /* non-JSON or empty body \u2014 leave env unchanged */ }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Retrieve Bob's visible post",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario4-get-post",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/posts/{{originalPostId}}",
+            "description": "Expect 200 with post body for originalPostId."
+          },
+          "response": []
+        },
+        {
+          "name": "First Bob profile-post page",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario4-post-page-1",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/users/{{bobId}}/posts?size=1",
+            "description": "Expect 200 page size 1; may include nextCursor.\n\nCaptures: postCursor"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Capture-only: no pm.test assertions (constitution / FR-005)",
+                  "try {",
+                  "  var json = pm.response.json();",
+                  "  if (json.nextCursor !== undefined && json.nextCursor !== null) {",
+                  "    pm.environment.set(\"postCursor\", json.nextCursor);",
+                  "  }",
+                  "} catch (e) { /* non-JSON or empty body \u2014 leave env unchanged */ }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Next Bob profile-post page",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario4-post-page-2",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/users/{{bobId}}/posts?size=1&cursor={{postCursor}}",
+            "description": "Expect 200 next page using captured postCursor."
+          },
+          "response": []
+        },
+        {
+          "name": "Reject empty post",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bobJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario6-reject-empty-post",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/posts",
+            "description": "Expect validation failure for empty text.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reject whitespace-only post",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bobJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario6-reject-blank-post",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/posts",
+            "description": "Expect validation failure for blank text.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"   \"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reject 281-code-point post",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bobJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario6-reject-281",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/posts",
+            "description": "Expect validation failure over 280 code points.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"{{oversizedPostText}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"oversizedPostText\", \"\ud83d\ude00\".repeat(281));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject client-supplied ownership",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bobJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario6-reject-author-id",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/posts",
+            "description": "Expect rejection of client-supplied authorId; ownership comes from JWT.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Ownership must come from the JWT\",\n  \"authorId\": \"{{aliceId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reject malformed profile-post cursor",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario6-reject-post-cursor",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/users/{{bobId}}/posts?cursor=not-a-cursor",
+            "description": "Expect client error for malformed cursor."
+          },
+          "response": []
+        },
+        {
+          "name": "Reject oversized profile-post page",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario6-reject-post-size",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/users/{{bobId}}/posts?size=101",
+            "description": "Expect client error for page size over limit."
+          },
+          "response": []
+        },
+        {
+          "name": "Reject publish without JWT",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario6-reject-missing-jwt",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/posts",
+            "description": "Expect 401/unauthorized for missing JWT.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"No anonymous publication\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Alice cannot delete Bob's post",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{aliceJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario6-reject-foreign-delete",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/posts/{{boundaryPostId}}",
+            "description": "Expect forbidden; Alice cannot delete Bob's boundaryPostId."
+          },
+          "response": []
+        },
+        {
+          "name": "Forbidden delete left post visible",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario6-post-still-visible",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/posts/{{boundaryPostId}}",
+            "description": "Expect 200; post still exists after forbidden delete."
+          },
+          "response": []
+        },
+        {
+          "name": "Bob deletes his boundary post",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bobJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario4-owner-delete",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/posts/{{boundaryPostId}}",
+            "description": "Expect success for owner delete."
+          },
+          "response": []
+        },
+        {
+          "name": "Bob repeats delete (idempotent)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bobJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario4-owner-delete-repeat",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/posts/{{boundaryPostId}}",
+            "description": "Expect stable success for repeat delete (idempotent)."
+          },
+          "response": []
+        },
+        {
+          "name": "Deleted post unavailable",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario4-get-deleted",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/posts/{{boundaryPostId}}",
+            "description": "Expect not found after owner delete."
+          },
+          "response": []
+        },
+        {
+          "name": "Deleted post omitted from profile list",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario4-list-after-delete",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/users/{{bobId}}/posts?size=20",
+            "description": "Expect page without boundaryPostId."
+          },
+          "response": []
+        },
+        {
+          "name": "No post-edit route",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bobJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario4-no-edit-route",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/posts/{{originalPostId}}",
+            "description": "Expect 404/method not allowed \u2014 posts are not editable.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"An edit must not be accepted\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "03 Follows & Timeline",
+      "description": "Follow graph, home timeline pages, cursor errors, unfollow/refollow boundary. Needs Alice/Bob JWTs and IDs.",
+      "item": [
+        {
+          "name": "Alice follows Bob",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{aliceJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario2-follow-bob",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/follows/{{bobId}}",
+            "description": "Expect success follow.\n\nCaptures: followRelationshipId"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Capture-only: no pm.test assertions (constitution / FR-005)",
+                  "try {",
+                  "  var json = pm.response.json();",
+                  "  if (json.id !== undefined && json.id !== null) {",
+                  "    pm.environment.set(\"followRelationshipId\", json.id);",
+                  "  }",
+                  "} catch (e) { /* non-JSON or empty body \u2014 leave env unchanged */ }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Follow Bob repeat (idempotent)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{aliceJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario2-follow-bob-repeat",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/follows/{{bobId}}",
+            "description": "Expect idempotent success on repeat follow."
+          },
+          "response": []
+        },
+        {
+          "name": "Reject self-follow",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{aliceJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario6-reject-self-follow",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/follows/{{aliceId}}",
+            "description": "Expect rejection when Alice follows herself."
+          },
+          "response": []
+        },
+        {
+          "name": "Bob publishes for home timeline",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bobJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario2-publish-fanout",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/posts",
+            "description": "Expect 201 post that fans out to Alice's home timeline.\n\nCaptures: timelinePostId",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"A post for the home timeline\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Capture-only: no pm.test assertions (constitution / FR-005)",
+                  "try {",
+                  "  var json = pm.response.json();",
+                  "  if (json.id !== undefined && json.id !== null) {",
+                  "    pm.environment.set(\"timelinePostId\", json.id);",
+                  "  }",
+                  "} catch (e) { /* non-JSON or empty body \u2014 leave env unchanged */ }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Alice home timeline - first page",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{aliceJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario3-home-page-1",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/timeline/home?size=20",
+            "description": "Expect 200 including recent followed posts.\n\nCaptures: timelineCursor"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Capture-only: no pm.test assertions (constitution / FR-005)",
+                  "try {",
+                  "  var json = pm.response.json();",
+                  "  if (json.nextCursor !== undefined && json.nextCursor !== null) {",
+                  "    pm.environment.set(\"timelineCursor\", json.nextCursor);",
+                  "  }",
+                  "} catch (e) { /* non-JSON or empty body \u2014 leave env unchanged */ }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Alice home timeline - next page",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{aliceJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario3-home-page-2",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/timeline/home?size=20&cursor={{timelineCursor}}",
+            "description": "Expect 200 stable next page."
+          },
+          "response": []
+        },
+        {
+          "name": "Reject malformed timeline cursor",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{aliceJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario3-malformed-timeline-cursor",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/timeline/home?cursor=not-a-cursor",
+            "description": "Expect client error for bad cursor."
+          },
+          "response": []
+        },
+        {
+          "name": "Reject oversized timeline page",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{aliceJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario3-oversized-timeline-page",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/timeline/home?size=101",
+            "description": "Expect client error for size over limit."
+          },
+          "response": []
+        },
+        {
+          "name": "Alice unfollows Bob",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{aliceJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario5-unfollow-bob",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/follows/{{bobId}}",
+            "description": "Expect success unfollow."
+          },
+          "response": []
+        },
+        {
+          "name": "Unfollow Bob repeat (idempotent)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{aliceJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario5-unfollow-bob-repeat",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/follows/{{bobId}}",
+            "description": "Expect idempotent success on repeat unfollow."
+          },
+          "response": []
+        },
+        {
+          "name": "Alice re-follows Bob",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{aliceJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario5-refollow-bob",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/follows/{{bobId}}",
+            "description": "Expect success; historical posts before re-follow are not backfilled."
+          },
+          "response": []
+        },
+        {
+          "name": "Bob publishes after re-follow",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bobJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario5-publish-after-refollow",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/posts",
+            "description": "Expect 201; this post should appear on Alice timeline after re-follow.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Visible only after the new follow period begins\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Verify re-follow timeline boundary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{aliceJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario5-home-after-refollow",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/timeline/home?size=20",
+            "description": "Expect recent post after re-follow; no historical backfill of unfollowed period."
+          },
+          "response": []
+        },
+        {
+          "name": "Bob follows Alice",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bobJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario4-bob-follows-alice",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/follows/{{aliceId}}",
+            "description": "Expect success so Alice replies can appear on Bob's home timeline."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "04 Engagement",
+      "description": "Like, reply, deleted-parent behavior, self-reply without self-notification.",
+      "item": [
+        {
+          "name": "Bob publishes interaction parent",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bobJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario4-publish-interaction-parent",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/posts",
+            "description": "Expect 201 parent for like/reply demos.\n\nCaptures: interactionParentId",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"A visible parent for the like and reply demonstration\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Capture-only: no pm.test assertions (constitution / FR-005)",
+                  "try {",
+                  "  var json = pm.response.json();",
+                  "  if (json.id !== undefined && json.id !== null) {",
+                  "    pm.environment.set(\"interactionParentId\", json.id);",
+                  "  }",
+                  "} catch (e) { /* non-JSON or empty body \u2014 leave env unchanged */ }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Alice likes Bob's post",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{aliceJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario4-like-parent",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/posts/{{interactionParentId}}/likes/me",
+            "description": "Expect success like."
+          },
+          "response": []
+        },
+        {
+          "name": "Like repeat (idempotent)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{aliceJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario4-like-parent-repeat",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/posts/{{interactionParentId}}/likes/me",
+            "description": "Expect idempotent success."
+          },
+          "response": []
+        },
+        {
+          "name": "Alice replies to Bob's post",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{aliceJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario4-create-reply",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/posts/{{interactionParentId}}/replies",
+            "description": "Expect 201 reply.\n\nCaptures: replyPostId",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"An immutable direct-parent reply\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Capture-only: no pm.test assertions (constitution / FR-005)",
+                  "try {",
+                  "  var json = pm.response.json();",
+                  "  if (json.id !== undefined && json.id !== null) {",
+                  "    pm.environment.set(\"replyPostId\", json.id);",
+                  "  }",
+                  "} catch (e) { /* non-JSON or empty body \u2014 leave env unchanged */ }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Retrieve reply with parent",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario4-get-reply-before-parent-delete",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/posts/{{replyPostId}}",
+            "description": "Expect 200 reply with parent available."
+          },
+          "response": []
+        },
+        {
+          "name": "Poll Bob home for Alice reply",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bobJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario4-reply-in-bob-timeline",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/timeline/home?size=20",
+            "description": "Expect Alice's reply eventually on Bob's home timeline."
+          },
+          "response": []
+        },
+        {
+          "name": "Bob deletes parent post",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bobJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario4-delete-interaction-parent",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/posts/{{interactionParentId}}",
+            "description": "Expect success; replies should survive."
+          },
+          "response": []
+        },
+        {
+          "name": "Reply survives unavailable parent",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario4-get-reply-after-parent-delete",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/posts/{{replyPostId}}",
+            "description": "Expect reply with parent.available=false (or equivalent)."
+          },
+          "response": []
+        },
+        {
+          "name": "Bob timeline hydrates unavailable parent",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bobJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario4-reply-after-parent-delete",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/timeline/home?size=20",
+            "description": "Expect reply still hydrates with unavailable parent label."
+          },
+          "response": []
+        },
+        {
+          "name": "Reject like on deleted parent",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{aliceJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario4-reject-like-deleted-parent",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/posts/{{interactionParentId}}/likes/me",
+            "description": "Expect rejection liking deleted parent."
+          },
+          "response": []
+        },
+        {
+          "name": "Reject reply on deleted parent",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{aliceJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario4-reject-reply-deleted-parent",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/posts/{{interactionParentId}}/replies",
+            "description": "Expect rejection replying to deleted parent.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"This reply must not be created\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Bob self-reply (no self-notification)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bobJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario4-self-reply-no-notification",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/posts/{{originalPostId}}/replies",
+            "description": "Run while originalPostId still exists. Expect 201 reply; Bob should not receive a self-notification.\n\nCaptures: selfReplyPostId",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"A valid self-reply that must not notify Bob\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Capture-only: no pm.test assertions (constitution / FR-005)",
+                  "try {",
+                  "  var json = pm.response.json();",
+                  "  if (json.id !== undefined && json.id !== null) {",
+                  "    pm.environment.set(\"selfReplyPostId\", json.id);",
+                  "  }",
+                  "} catch (e) { /* non-JSON or empty body \u2014 leave env unchanged */ }"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 Notifications",
+      "description": "Recipient pages, ownership isolation, cursor errors.\n\n**Doc-only (N7):** Kafka DLT inspection and unchanged-event replay use shell commands in specs/002-postman-collection/quickstart.md (not HTTP).",
+      "item": [
+        {
+          "name": "Poll Bob's notifications",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bobJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario4-poll-bob-notifications",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/notifications?size=20",
+            "description": "Expect Bob-owned page only. Poll after follow/reply triggers.\n\nCaptures: notificationCursor"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Capture-only: no pm.test assertions (constitution / FR-005)",
+                  "try {",
+                  "  var json = pm.response.json();",
+                  "  if (json.nextCursor !== undefined && json.nextCursor !== null) {",
+                  "    pm.environment.set(\"notificationCursor\", json.nextCursor);",
+                  "  }",
+                  "} catch (e) { /* non-JSON or empty body \u2014 leave env unchanged */ }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Bob notifications next page",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bobJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario4-bob-notifications-next",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/notifications?size=20&cursor={{notificationCursor}}",
+            "description": "Expect stable keyset next page."
+          },
+          "response": []
+        },
+        {
+          "name": "Alice own notifications",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{aliceJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario6-alice-notifications",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/notifications?size=20",
+            "description": "Expect only Alice-owned rows for Alice JWT."
+          },
+          "response": []
+        },
+        {
+          "name": "Reject cross-user notification access",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{aliceJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Target-User-Id",
+                "value": "{{bobId}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario6-reject-cross-user-notifications",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/notifications?size=20&userId={{bobId}}",
+            "description": "Extra userId/header must not expose Bob's notifications; page remains Alice's."
+          },
+          "response": []
+        },
+        {
+          "name": "Reject malformed notification cursor",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bobJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario6-reject-notification-cursor",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/notifications?cursor=not-a-cursor",
+            "description": "Expect client error for bad cursor."
+          },
+          "response": []
+        },
+        {
+          "name": "Reject oversized notification page",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bobJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario6-reject-notification-size",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/notifications?size=101",
+            "description": "Expect client error for size over limit."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "06 Gateway Limits",
+      "description": "OPTIONAL everyday skip. Auth bucket 10/min per client address; write bucket 60/min per JWT subject. Wait \u226560s for full buckets. Use Collection Runner + data files for exhaust bursts (delay 0). No pm.test assertions.",
+      "item": [
+        {
+          "name": "Rate-limit register",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario12-register",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/auth/register",
+            "description": "Prep: register dedicated rate-limit account (uses 1 auth token). Skip if 409 exists.\n\nCaptures: rateLimitUserId on 201",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{rateLimitEmail}}\",\n  \"username\": \"{{rateLimitUsername}}\",\n  \"displayName\": \"Rate Limit Demo\",\n  \"bio\": \"Dedicated SC-012 subject\",\n  \"password\": \"{{rateLimitPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Capture-only",
+                  "try {",
+                  "  if (pm.response.code === 201) {",
+                  "    var json = pm.response.json();",
+                  "    if (json.id) pm.environment.set('rateLimitUserId', json.id);",
+                  "  }",
+                  "} catch (e) {}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rate-limit login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario12-login",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/auth/login",
+            "description": "Prep: login rate-limit account.\n\nCaptures: rateLimitJwt, rateLimitUserId",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"login\": \"{{rateLimitUsername}}\",\n  \"password\": \"{{rateLimitPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Capture-only: no pm.test assertions (constitution / FR-005)",
+                  "try {",
+                  "  var json = pm.response.json();",
+                  "  if (json.accessToken !== undefined && json.accessToken !== null) {",
+                  "    pm.environment.set(\"rateLimitJwt\", json.accessToken);",
+                  "  }",
+                  "  if (json.id !== undefined && json.id !== null) {",
+                  "    pm.environment.set(\"rateLimitUserId\", json.id);",
+                  "  }",
+                  "} catch (e) { /* non-JSON or empty body \u2014 leave env unchanged */ }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Auth bucket exhaust probe",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario12-auth-exhaust-{{n}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/auth/login",
+            "description": "RUNNER: use data file `postman/data/auth-exhaust-11.csv` (11 rows) with delay 0 for a tight burst. Expect ~10 domain 401 and at least one 429 with X-RateLimit-Remaining: 0.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"login\": \"rate-limit-unknown-user\",\n  \"password\": \"definitely-wrong-password\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Auth exhausted register rejected",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario12-auth-rejected-register",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/auth/register",
+            "description": "Run immediately after auth exhaust. Expect 429; identity must not become a public profile.\n\nSets rejectedRateLimitUsername for profile check.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{rlRejectEmail}}\",\n  \"username\": \"{{rejectedRateLimitUsername}}\",\n  \"displayName\": \"Must Not Exist\",\n  \"bio\": \"\",\n  \"password\": \"{{rateLimitPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var ts = Date.now().toString();",
+                  "pm.environment.set('rejectedRateLimitUsername', 'RateLimitRejected' + ts);",
+                  "pm.environment.set('rlRejectEmail', 'rate-limit-rejected-' + ts + '@example.test');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Auth exhausted profile absent",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario12-auth-rejected-profile-check",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/profiles/{{rejectedRateLimitUsername}}",
+            "description": "Expect 404/not found for rejected registration username."
+          },
+          "response": []
+        },
+        {
+          "name": "Auth bucket after refill",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario12-auth-after-refill",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/auth/login",
+            "description": "Wait \u226560s after exhaust. Expect 401 (domain reached) not 429.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"login\": \"rate-limit-unknown-user\",\n  \"password\": \"definitely-wrong-password\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Write bucket exhaust probe",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{rateLimitJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario12-write-exhaust-{{n}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/follows/{{bobId}}",
+            "description": "RUNNER: data file `postman/data/write-exhaust-61.csv` (61 rows), delay 0, requires rateLimitJwt and bobId. Expect ~60 2xx and \u22651 429."
+          },
+          "response": []
+        },
+        {
+          "name": "Write exhausted post rejected",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{rateLimitJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario12-write-rejected-post",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/posts",
+            "description": "Immediately after write exhaust. Expect 429; marker text must not appear in author posts.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"RATE-LIMIT-REJECTED-MARKER-must-not-exist\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Write exhausted post absent",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{rateLimitJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario12-write-rejected-post-check",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/users/{{rateLimitUserId}}/posts?size=20",
+            "description": "Expect no RATE-LIMIT-REJECTED-MARKER in listed posts."
+          },
+          "response": []
+        },
+        {
+          "name": "Write bucket after refill",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{rateLimitJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario12-write-after-refill",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/posts",
+            "description": "Wait \u226560s after write exhaust. Expect 201 with refill marker.\n\nCaptures: rateLimitRefillPostId",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"RATE-LIMIT-REFILL-MARKER-must-exist\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Capture-only: no pm.test assertions (constitution / FR-005)",
+                  "try {",
+                  "  var json = pm.response.json();",
+                  "  if (json.id !== undefined && json.id !== null) {",
+                  "    pm.environment.set(\"rateLimitRefillPostId\", json.id);",
+                  "  }",
+                  "} catch (e) { /* non-JSON or empty body \u2014 leave env unchanged */ }"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "07 Optional Load",
+      "description": "OPTIONAL heavy demos. Use Collection Runner + CSV under postman/data/. Not part of Happy Path timing budget. Fan-out: run Login then Follow per data row (or folder with both) so fanoutJwt stays valid.",
+      "item": [
+        {
+          "name": "Seed timeline post (runner row)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bobJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario3-seed-post-{{n}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/posts",
+            "description": "OPTIONAL LOAD. Collection Runner + `postman/data/timeline-seed-200.csv` (200 rows). Set Runner delay ~1050ms. Requires bobJwt. Body uses {{seedText}} and {{n}}.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"{{seedText}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Register fan-out follower (runner row)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario9-register-{{n}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/auth/register",
+            "description": "OPTIONAL. Runner + `postman/data/fanout-followers-1000.csv`. Delay ~6100ms to respect auth rate limit (or override gateway to user-service on private network).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"username\": \"{{username}}\",\n  \"displayName\": \"{{displayName}}\",\n  \"bio\": \"Scenario 9 fan-out data\",\n  \"password\": \"{{fanoutPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login fan-out follower (runner row)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario9-login-{{n}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/auth/login",
+            "description": "OPTIONAL. Same data file as register. Captures fanoutJwt each iteration (overwrite). Delay ~6100ms on gateway.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"login\": \"{{username}}\",\n  \"password\": \"{{fanoutPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Capture-only: no pm.test assertions (constitution / FR-005)",
+                  "try {",
+                  "  var json = pm.response.json();",
+                  "  if (json.accessToken !== undefined && json.accessToken !== null) {",
+                  "    pm.environment.set(\"fanoutJwt\", json.accessToken);",
+                  "  }",
+                  "} catch (e) { /* non-JSON or empty body \u2014 leave env unchanged */ }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Fan-out follow Bob (runner row)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{fanoutJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario9-follow-{{n}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/follows/{{bobId}}",
+            "description": "OPTIONAL. Prefer Runner folder that sequences Login then Follow per data row so fanoutJwt is fresh. Requires bobId."
+          },
+          "response": []
+        },
+        {
+          "name": "Publish high-follower post",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bobJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario9-high-follower-publish",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/posts",
+            "description": "After fan-out follows exist. Expect 201 amplified publication.\n\nCaptures: highFollowerPostId",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"One publication amplified to 1,000 follower references\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Capture-only: no pm.test assertions (constitution / FR-005)",
+                  "try {",
+                  "  var json = pm.response.json();",
+                  "  if (json.id !== undefined && json.id !== null) {",
+                  "    pm.environment.set(\"highFollowerPostId\", json.id);",
+                  "  }",
+                  "} catch (e) { /* non-JSON or empty body \u2014 leave env unchanged */ }"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "08 Ops Notes",
+      "description": "Compose stop/start, private-network internal routes, and pointers to Kafka doc-only steps. Not for everyday Happy Path.",
+      "item": [
+        {
+          "name": "Home timeline during post-service stop",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{aliceJwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario7-post-dependency",
+                "type": "text"
+              }
+            ],
+            "url": "{{gateway}}/api/v1/timeline/home?size=20",
+            "description": "OPS-MANUAL: `docker compose stop post-service`, send this as Alice, observe documented failure/503 hydration behavior, then `docker compose start post-service` and re-check when healthy."
+          },
+          "response": []
+        },
+        {
+          "name": "Internal bulk lookup omits deleted",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "scenario4-bulk-after-delete",
+                "type": "text"
+              }
+            ],
+            "url": "{{postService}}/internal/v1/posts/bulk",
+            "description": "OPS-MANUAL: Gateway does not route /internal/v1. Set postService and call from private network / host-mapped post port only. Expect deleted boundaryPostId omitted; originalPostId may still appear if not deleted.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"postIds\": [\n    \"{{boundaryPostId}}\",\n    \"{{originalPostId}}\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
