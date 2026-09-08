@@ -1,5 +1,7 @@
 package com.example.socialmedia.timeline.application;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -7,6 +9,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import com.example.socialmedia.timeline.domain.TimelineEntry;
+import com.example.socialmedia.timeline.integration.FollowClient;
 import com.example.socialmedia.timeline.integration.PostClient;
 import com.example.socialmedia.timeline.persistence.TimelineRepository;
 import lombok.RequiredArgsConstructor;
@@ -17,9 +20,27 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class TimelineService {
 
+    private static final int FOLLOWER_PAGE_SIZE = 100;
     private final TimelineRepository timelineRepository;
     private final PostClient postClient;
     private final CursorCodec cursorCodec;
+    private final FollowClient followClient;
+    private final Clock clock;
+
+    public int applyPublishedPost(UUID eventId, UUID postId, UUID authorId,
+            Instant publishedAt) {
+        int inserted = 0;
+        String cursor = null;
+        do {
+            FollowClient.FollowerPage page = followClient.eligibleFollowers(authorId,
+                    publishedAt, cursor, FOLLOWER_PAGE_SIZE);
+            inserted += timelineRepository.insertReferences(page.items(), postId, authorId,
+                    publishedAt, eventId, clock.instant());
+            cursor = page.nextCursor();
+        }
+        while (cursor != null);
+        return inserted;
+    }
 
     @Transactional(readOnly = true)
     public TimelinePage home(UUID ownerUserId, String encodedCursor, int size,

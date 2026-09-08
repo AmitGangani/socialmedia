@@ -1,3 +1,11 @@
+# Dotfiles and dot-directories
+.*
+!.gitignore
+!.dockerignore
+!.env.example
+!.github/
+!.mvn/
+
 # Java and Maven outputs
 target/
 *.class
@@ -6,18 +14,12 @@ target/
 .mvn/timing.properties
 
 # Local IDE and operating-system files
-.idea/
-.vscode/
 *.iml
-.DS_Store
 Thumbs.db
 *.tmp
 *.swp
 
 # Local environment and generated credentials
-.env
-.env.*
-!.env.example
 secrets/
 *.pem
 *.key
