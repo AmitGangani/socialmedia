@@ -7,9 +7,9 @@ import java.util.Base64;
 import java.util.Set;
 import java.util.UUID;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -28,7 +28,7 @@ public class CursorCodec {
                     new CursorDocument(1, followedAt, followerId));
             return Base64.getUrlEncoder().withoutPadding().encodeToString(json);
         }
-        catch (JsonProcessingException exception) {
+        catch (JacksonException exception) {
             throw new IllegalStateException("Could not encode follower cursor", exception);
         }
     }
@@ -43,7 +43,7 @@ public class CursorCodec {
             if (root == null || !root.isObject() || root.size() != FIELDS.size()) {
                 throw malformed();
             }
-            root.fieldNames().forEachRemaining(name -> {
+            root.propertyNames().forEach(name -> {
                 if (!FIELDS.contains(name)) {
                     throw malformed();
                 }
@@ -56,7 +56,7 @@ public class CursorCodec {
             return new Cursor(Instant.parse(root.path("followedAt").textValue()),
                     UUID.fromString(root.path("followerId").textValue()));
         }
-        catch (IllegalArgumentException | JsonProcessingException | DateTimeParseException exception) {
+        catch (IllegalArgumentException | JacksonException | DateTimeParseException exception) {
             throw malformed();
         }
     }

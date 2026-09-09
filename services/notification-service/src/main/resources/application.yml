@@ -45,15 +45,6 @@ spring:
 server:
   port: ${SERVER_PORT:8085}
 
-eureka:
-  client:
-    register-with-eureka: true
-    fetch-registry: true
-    service-url:
-      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
-  instance:
-    prefer-ip-address: true
-
 security:
   jwt:
     issuer: ${JWT_ISSUER:socialmedia-user-service}

@@ -6,7 +6,6 @@ import java.util.UUID;
 
 import com.example.socialmedia.post.application.PostService;
 import com.example.socialmedia.post.config.CorrelationIdFilter;
-import com.example.socialmedia.post.persistence.PostRepository;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -33,7 +32,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class PostController {
 
     private final PostService postService;
-    private final PostRepository postRepository;
 
     @PostMapping("/api/v1/posts")
     ResponseEntity<PostView> create(@AuthenticationPrincipal Jwt jwt,
@@ -88,7 +86,7 @@ public class PostController {
 
     @GetMapping("/internal/v1/users/{userId}/post-count")
     PostCount postCount(@PathVariable UUID userId) {
-        return new PostCount(postRepository.countByAuthorIdAndDeletedAtIsNull(userId));
+        return new PostCount(postService.countVisibleByAuthor(userId));
     }
 
     @PostMapping("/internal/v1/posts/bulk")

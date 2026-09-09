@@ -12,14 +12,14 @@ import com.example.socialmedia.follow.domain.OutboxEvent;
 import com.example.socialmedia.follow.integration.UserClient;
 import com.example.socialmedia.follow.persistence.FollowRepository;
 import com.example.socialmedia.follow.persistence.OutboxRepository;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 @Service
 @RequiredArgsConstructor
@@ -83,6 +83,12 @@ public class FollowService {
                 nextCursor);
     }
 
+    @Transactional(readOnly = true)
+    public FollowCounts followCounts(UUID accountId) {
+        return new FollowCounts(followRepository.countByFollowedId(accountId),
+                followRepository.countByFollowerId(accountId));
+    }
+
     private FollowResult create(UUID followerId, UUID followedId, String correlationId) {
         Instant followedAt = now();
         FollowRelationship relationship = new FollowRelationship(uuidV7Generator.get(),
@@ -99,7 +105,7 @@ public class FollowService {
         try {
             return objectMapper.writeValueAsString(value);
         }
-        catch (JsonProcessingException exception) {
+        catch (JacksonException exception) {
             throw new IllegalStateException("Could not serialize follow outbox payload", exception);
         }
     }
@@ -131,4 +137,8 @@ public class FollowService {
 
     public record FollowerPage(List<UUID> items, String nextCursor) {
     }
+
+    public record FollowCounts(long followerCount, long followingCount) {
+    }
+
 }

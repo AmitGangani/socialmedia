@@ -6,7 +6,6 @@ import java.util.UUID;
 
 import com.example.socialmedia.follow.application.FollowService;
 import com.example.socialmedia.follow.config.CorrelationIdFilter;
-import com.example.socialmedia.follow.persistence.FollowRepository;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +26,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class FollowController {
 
     private final FollowService followService;
-    private final FollowRepository followRepository;
 
     @PutMapping("/api/v1/follows/{followedUserId}")
     ResponseEntity<FollowView> follow(@PathVariable UUID followedUserId,
@@ -49,8 +47,8 @@ public class FollowController {
 
     @GetMapping("/internal/v1/users/{userId}/follow-counts")
     FollowCounts followCounts(@PathVariable UUID userId) {
-        return new FollowCounts(followRepository.countByFollowedId(userId),
-                followRepository.countByFollowerId(userId));
+        FollowService.FollowCounts counts = followService.followCounts(userId);
+        return new FollowCounts(counts.followerCount(), counts.followingCount());
     }
 
     @GetMapping("/internal/v1/users/{userId}/followers")

@@ -19,7 +19,6 @@
 
     <modules>
         <module>gateway</module>
-        <module>discovery-server</module>
         <module>services/user-service</module>
         <module>services/post-service</module>
         <module>services/follow-service</module>

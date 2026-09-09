@@ -41,15 +41,6 @@ spring:
 server:
   port: ${SERVER_PORT:8084}
 
-eureka:
-  client:
-    register-with-eureka: true
-    fetch-registry: true
-    service-url:
-      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
-  instance:
-    prefer-ip-address: true
-
 security:
   jwt:
     issuer: ${JWT_ISSUER:socialmedia-user-service}
@@ -59,9 +50,9 @@ clients:
   connect-timeout: 2s
   read-timeout: 2s
   follow-service:
-    base-url: http://follow-service
+    base-url: http://follow-service:8083
   post-service:
-    base-url: http://post-service
+    base-url: http://post-service:8082
 
 resilience4j:
   circuitbreaker:

@@ -10,14 +10,11 @@ import com.example.socialmedia.timeline.integration.FollowClient;
 import com.example.socialmedia.timeline.integration.PostClient;
 import com.github.f4b6a3.uuid.UuidCreator;
 import org.slf4j.MDC;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.client.circuitbreaker.CircuitBreakerFactory;
-import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Primary;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
@@ -49,14 +46,7 @@ public class TimelineApplication {
     }
 
     @Bean
-    @Primary
-    RestClient.Builder defaultRestClientBuilder(JdkClientHttpRequestFactory requestFactory) {
-        return RestClient.builder().requestFactory(requestFactory);
-    }
-
-    @Bean
-    @LoadBalanced
-    RestClient.Builder loadBalancedRestClientBuilder(JdkClientHttpRequestFactory requestFactory) {
+    RestClient.Builder restClientBuilder(JdkClientHttpRequestFactory requestFactory) {
         return RestClient.builder().requestFactory(requestFactory)
                 .requestInterceptor((request, body, execution) -> {
                     String correlationId = MDC.get("correlationId");
@@ -68,14 +58,13 @@ public class TimelineApplication {
     }
 
     @Bean
-    FollowClient followClient(
-            @Qualifier("loadBalancedRestClientBuilder") RestClient.Builder builder,
+    FollowClient followClient(RestClient.Builder builder,
             @Value("${clients.follow-service.base-url}") String followServiceBaseUrl) {
         return new FollowClient(builder, followServiceBaseUrl);
     }
 
     @Bean
-    PostClient postClient(@Qualifier("loadBalancedRestClientBuilder") RestClient.Builder builder,
+    PostClient postClient(RestClient.Builder builder,
             @Value("${clients.post-service.base-url}") String postServiceBaseUrl,
             CircuitBreakerFactory<?, ?> circuitBreakerFactory) {
         return new PostClient(builder, postServiceBaseUrl, circuitBreakerFactory);

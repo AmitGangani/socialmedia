@@ -80,35 +80,15 @@ services:
     networks:
       - socialmedia-private
 
-  discovery-server:
-    <<: *app-runtime
-    image: socialmedia/discovery-server:local
-    build:
-      context: .
-      dockerfile: discovery-server/Dockerfile
-    environment:
-      SPRING_APPLICATION_NAME: discovery-server
-      SERVER_PORT: 8761
-    ports:
-      - "8761:8761"
-    networks:
-      - socialmedia-edge
-      - socialmedia-private
-    healthcheck: *app-healthcheck
-
   gateway:
     <<: *app-runtime
     image: socialmedia/gateway:local
     build:
       context: .
       dockerfile: gateway/Dockerfile
-    depends_on:
-      discovery-server:
-        condition: service_healthy
     environment:
       SPRING_APPLICATION_NAME: api-gateway
       SERVER_PORT: 8080
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
       JWT_PUBLIC_KEY_LOCATION: file:/run/secrets/jwt-public.pem
     volumes:
       - ${JWT_KEYS_DIRECTORY:-./secrets}:/run/secrets:ro
@@ -128,12 +108,9 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      discovery-server:
-        condition: service_healthy
     environment:
       SPRING_APPLICATION_NAME: user-service
       SERVER_PORT: 8081
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/user_db
       SPRING_DATASOURCE_USERNAME: user_service
       SPRING_DATASOURCE_PASSWORD: ${USER_DB_PASSWORD:?Set USER_DB_PASSWORD in .env}
@@ -156,12 +133,9 @@ services:
         condition: service_healthy
       kafka-topic-init:
         condition: service_completed_successfully
-      discovery-server:
-        condition: service_healthy
     environment:
       SPRING_APPLICATION_NAME: post-service
       SERVER_PORT: 8082
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/post_db
       SPRING_DATASOURCE_USERNAME: post_service
       SPRING_DATASOURCE_PASSWORD: ${POST_DB_PASSWORD:?Set POST_DB_PASSWORD in .env}
@@ -182,12 +156,9 @@ services:
         condition: service_healthy
       kafka-topic-init:
         condition: service_completed_successfully
-      discovery-server:
-        condition: service_healthy
     environment:
       SPRING_APPLICATION_NAME: follow-service
       SERVER_PORT: 8083
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/follow_db
       SPRING_DATASOURCE_USERNAME: follow_service
       SPRING_DATASOURCE_PASSWORD: ${FOLLOW_DB_PASSWORD:?Set FOLLOW_DB_PASSWORD in .env}
@@ -208,12 +179,9 @@ services:
         condition: service_healthy
       kafka-topic-init:
         condition: service_completed_successfully
-      discovery-server:
-        condition: service_healthy
     environment:
       SPRING_APPLICATION_NAME: timeline-service
       SERVER_PORT: 8084
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/timeline_db
       SPRING_DATASOURCE_USERNAME: timeline_service
       SPRING_DATASOURCE_PASSWORD: ${TIMELINE_DB_PASSWORD:?Set TIMELINE_DB_PASSWORD in .env}
@@ -234,12 +202,9 @@ services:
         condition: service_healthy
       kafka-topic-init:
         condition: service_completed_successfully
-      discovery-server:
-        condition: service_healthy
     environment:
       SPRING_APPLICATION_NAME: notification-service
       SERVER_PORT: 8085
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/notification_db
       SPRING_DATASOURCE_USERNAME: notification_service
       SPRING_DATASOURCE_PASSWORD: ${NOTIFICATION_DB_PASSWORD:?Set NOTIFICATION_DB_PASSWORD in .env}

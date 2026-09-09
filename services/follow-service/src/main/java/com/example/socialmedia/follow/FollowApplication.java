@@ -9,13 +9,10 @@ import java.util.function.Supplier;
 import com.example.socialmedia.follow.integration.UserClient;
 import com.github.f4b6a3.uuid.UuidCreator;
 import org.slf4j.MDC;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Primary;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.web.client.RestClient;
@@ -49,14 +46,7 @@ public class FollowApplication {
     }
 
     @Bean
-    @Primary
-    RestClient.Builder defaultRestClientBuilder(JdkClientHttpRequestFactory requestFactory) {
-        return RestClient.builder().requestFactory(requestFactory);
-    }
-
-    @Bean
-    @LoadBalanced
-    RestClient.Builder loadBalancedRestClientBuilder(JdkClientHttpRequestFactory requestFactory) {
+    RestClient.Builder restClientBuilder(JdkClientHttpRequestFactory requestFactory) {
         return RestClient.builder().requestFactory(requestFactory)
                 .requestInterceptor((request, body, execution) -> {
                     String correlationId = MDC.get("correlationId");
@@ -68,7 +58,7 @@ public class FollowApplication {
     }
 
     @Bean
-    UserClient userClient(@Qualifier("loadBalancedRestClientBuilder") RestClient.Builder builder,
+    UserClient userClient(RestClient.Builder builder,
             @Value("${clients.user-service.base-url}") String userServiceBaseUrl) {
         return new UserClient(builder, userServiceBaseUrl);
     }

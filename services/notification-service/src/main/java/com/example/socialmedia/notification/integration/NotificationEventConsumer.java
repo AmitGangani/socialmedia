@@ -6,8 +6,6 @@ import java.util.UUID;
 
 import com.example.socialmedia.notification.application.NotificationService;
 import com.example.socialmedia.notification.domain.Notification;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
@@ -15,6 +13,8 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 @Component
 @RequiredArgsConstructor
@@ -157,7 +157,7 @@ public class NotificationEventConsumer {
         if (node == null || !node.isObject() || node.size() != fields.size()) {
             throw new IllegalArgumentException("Event object has an invalid field shape");
         }
-        node.fieldNames().forEachRemaining(name -> {
+        node.propertyNames().forEach(name -> {
             if (!fields.contains(name)) {
                 throw new IllegalArgumentException("Unknown event field: " + name);
             }

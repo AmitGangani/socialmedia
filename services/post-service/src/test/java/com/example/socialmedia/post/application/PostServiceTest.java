@@ -15,12 +15,12 @@ import com.example.socialmedia.post.domain.OutboxEvent;
 import com.example.socialmedia.post.persistence.OutboxRepository;
 import com.example.socialmedia.post.persistence.PostLikeRepository;
 import com.example.socialmedia.post.persistence.PostRepository;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import tools.jackson.databind.json.JsonMapper;
 
 @ExtendWith(MockitoExtension.class)
 class PostServiceTest {
@@ -42,7 +42,7 @@ class PostServiceTest {
         Instant publishedAt = Instant.parse("2026-09-08T12:00:00Z");
         ArrayDeque<UUID> ids = new ArrayDeque<>(List.of(postId, eventId));
         PostService service = new PostService(postRepository, postLikeRepository,
-                outboxRepository, cursorCodec, new ObjectMapper().findAndRegisterModules(),
+                outboxRepository, cursorCodec, JsonMapper.builder().findAndAddModules().build(),
                 ids::removeFirst, Clock.fixed(publishedAt, ZoneOffset.UTC));
 
         PostService.PostResult result = service.createOriginal(authorId, "Hello", "correlation-1");

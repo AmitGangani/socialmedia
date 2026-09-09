@@ -17,14 +17,14 @@ import com.example.socialmedia.post.domain.Post;
 import com.example.socialmedia.post.persistence.OutboxRepository;
 import com.example.socialmedia.post.persistence.PostLikeRepository;
 import com.example.socialmedia.post.persistence.PostRepository;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 @Service
 @RequiredArgsConstructor
@@ -111,6 +111,11 @@ public class PostService {
         return projections(postRepository.findAllByIdInAndDeletedAtIsNull(postIds));
     }
 
+    @Transactional(readOnly = true)
+    public long countVisibleByAuthor(UUID authorId) {
+        return postRepository.countByAuthorIdAndDeletedAtIsNull(authorId);
+    }
+
     @Transactional
     public void delete(UUID postId, UUID authorId, String correlationId) {
         Post existing = postRepository.findByIdForUpdate(postId)
@@ -136,7 +141,7 @@ public class PostService {
         try {
             return objectMapper.writeValueAsString(value);
         }
-        catch (JsonProcessingException exception) {
+        catch (JacksonException exception) {
             throw new IllegalStateException("Could not serialize post outbox payload", exception);
         }
     }

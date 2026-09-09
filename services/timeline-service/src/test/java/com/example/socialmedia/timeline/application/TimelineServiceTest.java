@@ -1,6 +1,7 @@
 package com.example.socialmedia.timeline.application;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Clock;
@@ -60,5 +61,25 @@ class TimelineServiceTest {
         int inserted = timelineService.applyPublishedPost(eventId, postId, authorId, PUBLISHED_AT);
 
         assertEquals(3, inserted);
+    }
+
+    @Test
+    void deletedPostRemovesFeedEntries() {
+        UUID postId = UUID.randomUUID();
+
+        timelineService.applyDeletedPost(postId);
+
+        verify(timelineRepository).deleteByPostId(postId);
+    }
+
+    @Test
+    void removedFollowRelationshipRemovesFeedEntries() {
+        UUID followerId = UUID.randomUUID();
+        UUID followedId = UUID.randomUUID();
+
+        timelineService.applyRemovedFollowRelationship(followerId, followedId, PUBLISHED_AT);
+
+        verify(timelineRepository).deleteByOwnerAndAuthorThrough(
+                followerId, followedId, PUBLISHED_AT);
     }
 }

@@ -42,6 +42,15 @@ public class TimelineService {
         return inserted;
     }
 
+    public void applyDeletedPost(UUID postId) {
+        timelineRepository.deleteByPostId(postId);
+    }
+
+    public void applyRemovedFollowRelationship(UUID followerId, UUID followedId,
+            Instant unfollowedAt) {
+        timelineRepository.deleteByOwnerAndAuthorThrough(followerId, followedId, unfollowedAt);
+    }
+
     @Transactional(readOnly = true)
     public TimelinePage home(UUID ownerUserId, String encodedCursor, int size,
             String correlationId) {
@@ -74,12 +83,20 @@ public class TimelineService {
             return null;
         }
         return new TimelineItem(post.id(), post.authorId(), post.text(), post.publishedAt(),
-                post.reply(), post.parent(), post.likeCount(), viewerId.equals(post.authorId()));
+                post.reply(), parentReference(post.parent()), post.likeCount(),
+                viewerId.equals(post.authorId()));
+    }
+
+    private static ParentReference parentReference(PostClient.ParentReference parent) {
+        return parent == null ? null : new ParentReference(parent.postId(), parent.available());
     }
 
     public record TimelineItem(UUID id, UUID authorId, String text, java.time.Instant publishedAt,
-            boolean reply, PostClient.ParentReference parent, long likeCount,
+            boolean reply, ParentReference parent, long likeCount,
             boolean deletionAvailable) {
+    }
+
+    public record ParentReference(UUID postId, boolean available) {
     }
 
     public record TimelinePage(List<TimelineItem> items, String nextCursor) {
